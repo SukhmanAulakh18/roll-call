@@ -1,0 +1,30 @@
+apiVersion: rollcall.dev/v1alpha1
+kind: AgentRecord
+metadata:
+  name: invoice-recon
+  namespace: roll-call-demo
+spec:
+  name: Invoice Reconciliation
+  purpose: Match supplier invoices to ledger entries
+  owner: {name: Dana Okafor, team: Finance Ops, escalation: pager://invoice-recon-oncall}
+  developer: Platform AI
+  origin: internal
+  riskRating: low
+  version: 1.0.0
+  deploymentDate: "2026-10-15"
+  reviewer: Model Risk
+  approver: Chief Risk Office
+  dataSources: [invoices]
+  approvedUses: ["Match supplier invoices to ledger entries"]
+  limitations: ["Never moves money", "Escalates low-confidence cases to a human"]
+  scopes:
+    tools: [ledger.read, llm.complete]
+    data: [invoices]
+  models: [llm-general-v2]
+  residency: ca-central
+  lifecycleState: shadow
+  evaluation: null
+  budgets: {perHourUsd: 5, perDayUsd: 40, perTaskUsd: 0.5}
+  reviewDate: "2027-04-15"
+  nextMonitoringDate: "2026-12-15"
+  runtimeRef: {kind: Deployment, name: invoice-recon, namespace: roll-call-demo}

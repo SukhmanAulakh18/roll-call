@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shadow-bot
+  namespace: roll-call-demo
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: shadow-bot}}
+  template:
+    metadata:
+      labels: {app: shadow-bot}
+    spec:
+      containers:
+        - name: bot
+          image: busybox:1.36.1
+          command: [sleep, "86400"]

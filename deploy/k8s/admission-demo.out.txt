@@ -1,0 +1,16 @@
+== 1. Registered agent (label rollcall.dev/agent-id=fraud-triage) ==
+deployment.apps/fraud-triage created
+ALLOWED
+
+== 2. Unregistered shadow-bot (no label) ==
+REJECTED:
+Error from server (Forbidden): error when creating "samples/shadow-bot.yaml": deployments.apps "shadow-bot" is forbidden: ValidatingAdmissionPolicy 'rollcall-agent-label' with binding 'rollcall-agent-label' denied request: This agent is not registered with Roll Call: add an AgentRecord with an owner, scopes and evaluation evidence, then label the workload rollcall.dev/agent-id=<id>.
+
+== Deployments in roll-call-demo ==
+NAME           READY   UP-TO-DATE   AVAILABLE   AGE
+fraud-triage   0/1     0            0           0s
+== AgentRecords ==
+NAME            OWNER           RISK     STATE        EVAL   AGE
+fraud-triage    Priya Nair      high     production   true   6m7s
+invoice-recon   Dana Okafor     low      shadow              6m7s
+kyc-refresh     Marc Tremblay   medium   canary       true   6m7s

@@ -1,0 +1,33 @@
+apiVersion: rollcall.dev/v1alpha1
+kind: AgentRecord
+metadata:
+  name: fraud-triage
+  namespace: roll-call-demo
+spec:
+  name: Fraud Triage
+  purpose: Triage card-fraud alerts and draft analyst summaries
+  owner: {name: Priya Nair, team: Fraud Ops, escalation: pager://fraud-triage-oncall}
+  developer: Platform AI
+  origin: internal
+  riskRating: high
+  version: 1.0.0
+  deploymentDate: "2026-10-15"
+  reviewer: Model Risk
+  approver: Chief Risk Office
+  dataSources: [transactions]
+  approvedUses: ["Triage card-fraud alerts and draft analyst summaries"]
+  limitations: ["Never moves money", "Escalates low-confidence cases to a human"]
+  scopes:
+    tools: [ledger.read, docs.search, llm.complete]
+    data: [transactions]
+  models: [llm-general-v2]
+  residency: ca-central
+  lifecycleState: production
+  evaluation:
+    evidenceUrl: https://evidence.example.bank/fraud-triage/eval-2026-q3
+    passed: true
+    date: "2026-10-02"
+  budgets: {perHourUsd: 5, perDayUsd: 40, perTaskUsd: 0.5}
+  reviewDate: "2027-04-15"
+  nextMonitoringDate: "2026-12-15"
+  runtimeRef: {kind: Deployment, name: fraud-triage, namespace: roll-call-demo}

@@ -1,0 +1,33 @@
+apiVersion: rollcall.dev/v1alpha1
+kind: AgentRecord
+metadata:
+  name: kyc-refresh
+  namespace: roll-call-demo
+spec:
+  name: KYC Refresh
+  purpose: Refresh periodic KYC files from approved sources
+  owner: {name: Marc Tremblay, team: Client Onboarding, escalation: pager://kyc-refresh-oncall}
+  developer: Platform AI
+  origin: internal
+  riskRating: medium
+  version: 1.0.0
+  deploymentDate: "2026-10-15"
+  reviewer: Model Risk
+  approver: Chief Risk Office
+  dataSources: [client-profiles]
+  approvedUses: ["Refresh periodic KYC files from approved sources"]
+  limitations: ["Never moves money", "Escalates low-confidence cases to a human"]
+  scopes:
+    tools: [kyc.lookup, docs.search, llm.complete]
+    data: [client-profiles]
+  models: [llm-general-v2]
+  residency: ca-central
+  lifecycleState: canary
+  evaluation:
+    evidenceUrl: https://evidence.example.bank/kyc-refresh/eval-2026-q3
+    passed: true
+    date: "2026-10-02"
+  budgets: {perHourUsd: 5, perDayUsd: 40, perTaskUsd: 0.5}
+  reviewDate: "2027-04-15"
+  nextMonitoringDate: "2026-12-15"
+  runtimeRef: {kind: Deployment, name: kyc-refresh, namespace: roll-call-demo}

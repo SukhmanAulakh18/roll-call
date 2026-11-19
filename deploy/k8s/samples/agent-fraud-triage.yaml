@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-triage
+  namespace: roll-call-demo
+  labels: {rollcall.dev/agent-id: fraud-triage}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: fraud-triage}}
+  template:
+    metadata:
+      labels: {app: fraud-triage, rollcall.dev/agent-id: fraud-triage}
+    spec:
+      containers:
+        - name: agent
+          image: busybox:1.36.1
+          command: [sleep, "86400"]

@@ -1,0 +1,20 @@
+# Layer (b): record lookup in the control plane. __CA_BUNDLE__ is filled in by kind-up.sh.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata: {name: rollcall-agent-record}
+webhooks:
+  - name: admission.rollcall.dev
+    admissionReviewVersions: [v1]
+    sideEffects: None
+    failurePolicy: Fail        # fail closed: no new admissions while control is down (ADR-004)
+    timeoutSeconds: 5
+    namespaceSelector:
+      matchLabels: {rollcall.dev/governed: "true"}
+    rules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: [CREATE, UPDATE]
+        resources: [deployments]
+    clientConfig:
+      caBundle: __CA_BUNDLE__
+      service: {namespace: rollcall-system, name: rollcall-control, path: /v1/admission/review, port: 443}

@@ -1,0 +1,90 @@
+# AgentRecord: E-23-style inventory entry. Mirrors AgentRecord in contracts/types.ts.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: agentrecords.rollcall.dev
+spec:
+  group: rollcall.dev
+  scope: Namespaced
+  names:
+    kind: AgentRecord
+    listKind: AgentRecordList
+    plural: agentrecords
+    singular: agentrecord
+    shortNames: [ar]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - {name: Owner, type: string, jsonPath: .spec.owner.name}
+        - {name: Risk, type: string, jsonPath: .spec.riskRating}
+        - {name: State, type: string, jsonPath: .spec.lifecycleState}
+        - {name: Eval, type: boolean, jsonPath: .spec.evaluation.passed}
+        - {name: Age, type: date, jsonPath: .metadata.creationTimestamp}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [owner, purpose, riskRating, scopes, approvedUses, lifecycleState]
+              x-kubernetes-validations:
+                - rule: "!(self.lifecycleState in ['canary','production']) || (has(self.evaluation) && self.evaluation.passed == true)"
+                  message: "canary and production agents need evaluation evidence with passed=true"
+                - rule: "self.lifecycleState != 'production' || self.riskRating != 'critical' || (has(self.approver) && self.approver != '')"
+                  message: "critical-risk production agents need a named approver"
+                - rule: "!(self.lifecycleState in ['canary','production']) || size(self.scopes.tools) > 0"
+                  message: "live agents must declare at least one tool scope"
+              properties:
+                name: {type: string}
+                purpose: {type: string, minLength: 1}
+                owner:
+                  type: object
+                  required: [name, team, escalation]
+                  properties:
+                    name: {type: string, minLength: 1}
+                    team: {type: string}
+                    escalation: {type: string}
+                developer: {type: string}
+                origin: {type: string, enum: [internal, vendor, open-source]}
+                riskRating: {type: string, enum: [low, medium, high, critical]}
+                version: {type: string}
+                deploymentDate: {type: string}
+                reviewer: {type: string}
+                approver: {type: string}
+                dataSources: {type: array, items: {type: string}}
+                approvedUses: {type: array, minItems: 1, items: {type: string}}
+                limitations: {type: array, items: {type: string}}
+                scopes:
+                  type: object
+                  required: [tools, data]
+                  properties:
+                    tools: {type: array, items: {type: string}}
+                    data: {type: array, items: {type: string}}
+                models: {type: array, items: {type: string}}
+                residency: {type: string}
+                lifecycleState: {type: string, enum: [draft, shadow, canary, production, retired]}
+                evaluation:
+                  type: object
+                  nullable: true
+                  required: [evidenceUrl, passed, date]
+                  properties:
+                    evidenceUrl: {type: string}
+                    passed: {type: boolean}
+                    date: {type: string}
+                budgets:
+                  type: object
+                  properties:
+                    perHourUsd: {type: number}
+                    perDayUsd: {type: number}
+                    perTaskUsd: {type: number}
+                reviewDate: {type: string}
+                nextMonitoringDate: {type: string}
+                runtimeRef:
+                  type: object
+                  properties:
+                    kind: {type: string, enum: [Deployment, Agent, Sandbox, SimProcess]}
+                    name: {type: string}
+                    namespace: {type: string}

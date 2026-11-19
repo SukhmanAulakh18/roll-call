@@ -1,0 +1,55 @@
+# Roll Call control plane inside kind: repo is mounted from the host (kind extraMounts -> /repo),
+# nginx sidecar terminates TLS (the webhook must be HTTPS) and forwards to the plain-HTTP control plane.
+apiVersion: v1
+kind: Namespace
+metadata: {name: rollcall-system}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: control-nginx, namespace: rollcall-system}
+data:
+  default.conf: |
+    server {
+      listen 8443 ssl;
+      ssl_certificate /tls/tls.crt;
+      ssl_certificate_key /tls/tls.key;
+      location / { proxy_pass http://127.0.0.1:7100; }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: rollcall-control, namespace: rollcall-system}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: rollcall-control}}
+  template:
+    metadata: {labels: {app: rollcall-control}}
+    spec:
+      containers:
+        - name: control
+          image: node:22.12-alpine
+          workingDir: /repo
+          command:
+            - node
+            - --experimental-strip-types
+            - --no-warnings
+            - -e
+            - "import('/repo/services/control/src/app.ts').then(m=>m.startControl({port:7100,dataDir:'/tmp/data',seedFile:'/repo/data/seed.json'})).then(h=>console.log('control up',h.url))"
+          readinessProbe: {httpGet: {path: /healthz, port: 7100}, periodSeconds: 3}
+          volumeMounts: [{name: repo, mountPath: /repo, readOnly: true}]
+        - name: tls
+          image: nginx:1.27.3-alpine
+          volumeMounts:
+            - {name: tls, mountPath: /tls, readOnly: true}
+            - {name: nginx, mountPath: /etc/nginx/conf.d}
+      volumes:
+        - {name: repo, hostPath: {path: /repo}}
+        - {name: tls, secret: {secretName: rollcall-webhook-tls}}
+        - {name: nginx, configMap: {name: control-nginx}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: rollcall-control, namespace: rollcall-system}
+spec:
+  selector: {app: rollcall-control}
+  ports: [{port: 443, targetPort: 8443}]
