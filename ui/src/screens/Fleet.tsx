@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import { Octagon, Pause, Play, Siren, X } from 'lucide-react';
 import type { ActionEvent } from '../../../contracts/types';
-import { getState, useStore, verifyReceipts } from '../store';
+import { getState, runDrill, useStore, verifyReceipts } from '../store';
 import { setUi, useUi } from '../ui-state';
 import { Assumption, CountUp, Initials, Measured, NotMeasured, Sparkline, StateMark, Tip, VerdictChip, VerifyButton, clock, groupIncidents, isNum, ownerShort, secs, useLocal, usd, type AgentState } from '../ui';
 import { Panel } from '../components';
@@ -272,13 +272,19 @@ export function Fleet({ selected }: { selected: string | null }) {
   const [tab, setTab] = useLocal<'decisions'>('rightTab', 'decisions');
   void tab; void setTab;
   const select = (id: string | null) => { location.hash = id ? `#/agent/${encodeURIComponent(id)}` : '#/'; };
+  const [tall, setTall] = useState(false);
+  const goDrill = () => { const r = getState().drillRun; location.hash = '#/drill'; if (!r || r.phase === 'done' || r.phase === 'error') void runDrill('runaway-loop', true); };
   return (
     <div className="fleet">
+      <div className="intro">
+        <p className="intro-t">Roll Call watches a bank's AI agents (software workers) and can stop one that goes wrong, with proof.</p>
+        <button className="btn btn--primary btn--lg" onClick={goDrill}><Play size={16} aria-hidden />Run a drill</button>
+      </div>
       <Hero />
       <IncidentBanner />
       <div className={`stage ${selected ? 'has-side' : ''}`}>
-        <Panel className="map-panel" title="Fleet map" aside={<Measured />} id="map-h">
-          <div className="map-frame" data-tour="map"><Suspense fallback={<p className="empty" role="status">Loading the map</p>}><FleetMap selected={selected} onSelect={select} /></Suspense></div>
+        <Panel className="map-panel" title="Fleet map" aside={<><Measured />{!selected && <button className="btn btn--sm" onClick={() => setTall(!tall)} aria-pressed={tall}>{tall ? 'Shrink map' : 'Expand map'}</button>}</>} id="map-h">
+          <div className={`map-frame ${tall || selected ? '' : 'map-frame--home'}`} data-tour="map"><Suspense fallback={<p className="empty" role="status">Loading the map</p>}><FleetMap selected={selected} onSelect={select} /></Suspense></div>
         </Panel>
         {selected ? <AgentPanel id={selected} onClose={() => select(null)} /> : <Ticker className="stage-ticker" />}
       </div>

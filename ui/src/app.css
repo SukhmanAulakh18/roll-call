@@ -416,3 +416,9 @@ dl { margin: 0; }
 ::placeholder { color: var(--color-muted); opacity: 1; }
 .arch-note { border: 0; border-top: var(--rule-hair) solid var(--color-rule); border-radius: 0; background: transparent; padding-inline: 0; }
 .gate { border: 0; border-radius: 0; } .verdict-card { border-radius: 0; }
+
+/* home: sentence and primary action first, shorter map until expanded */
+.intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-md); }
+.intro-t { margin: 0; font-size: 1.15rem; line-height: 1.4; max-width: 46rem; color: var(--color-ink); }
+.map-frame--home { height: 420px; }
+@media (max-width: 700px) { .map-frame--home { height: 420px; } }
