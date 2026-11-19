@@ -87,7 +87,8 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
   r.add('POST', '/v1/agents/:id/kill', async c => {
     if (!registry.get(c.params.id)) return fail(404, `no agent '${c.params.id}'`);
     const b = await c.json().catch(() => ({}));
-    return ok(await engine.kill(c.params.id, b?.reason ? String(b.reason) : 'manual kill'));
+    const ev = await engine.kill(c.params.id, b?.reason ? String(b.reason) : 'manual kill');
+    return ev.stage === 'proof' ? ok(ev) : { status: 502, body: ev }; // unproven kill is not a success: the caller gets the probe result
   });
   r.add('POST', '/v1/admission/review', async c => {
     const { out, workload, result } = review(await c.json(), registry.list());

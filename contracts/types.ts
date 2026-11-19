@@ -97,7 +97,7 @@ export interface PolicyBundle {
   staleAfterMs: number;                      // after this with no fresh bundle, high-risk tools fail closed
 }
 
-export type IncidentStage = 'detected' | 'throttled' | 'paged' | 'owner_ack' | 'killed' | 'proof' | 'resolved';
+export type IncidentStage = 'detected' | 'throttled' | 'paged' | 'owner_ack' | 'killed' | 'proof' | 'kill_unconfirmed' | 'resolved';
 
 export interface IncidentEvent {
   incidentId: string;

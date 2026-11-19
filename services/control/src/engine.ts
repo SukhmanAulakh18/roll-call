@@ -110,7 +110,7 @@ export function createEngine(d: EngineDeps) {
     }
   }
 
-  /** Revoke identity in the bundle, stop the runtime, then prove it with an independent probe. Returns the 'proof' event. */
+  /** Revoke identity in the bundle, stop the runtime, then prove it with an independent probe. Returns the 'proof' event, or 'kill_unconfirmed' when the probe was not denied with REVOKED. */
   function kill(agentId: string, reason: string): Promise<IncidentEvent> {
     let inc = open.get(agentId);
     if (!inc) {
@@ -125,11 +125,15 @@ export function createEngine(d: EngineDeps) {
       const last = [...ledger].reverse().find(e => e.agentId === agentId && e.governed && e.argsHash !== PROBE_ARGS_HASH);
       const tool = last?.tool ?? d.registry.get(agentId)?.scopes.tools[0] ?? 'ledger.read';
       const t = d.lastToken(agentId);
-      const token = t && t.expiresAt - now > 3000 ? t.token : d.mintToken(agentId, 15_000); // the identity as it was before revocation
+      const fresh = !(t && t.expiresAt - now > 3000);
+      const token = fresh ? d.mintToken(agentId, 15_000) : t!.token; // the identity as it was before revocation
       d.registry.revoke(agentId, now);
       d.registry.clearThrottle(agentId);
       let stopped = 'no runtime attached';
-      try { await Promise.race([d.runtime()?.stop(agentId), sleep(2000)]); if (d.runtime()) stopped = `runtime ${d.registry.get(agentId)?.runtimeRef.kind ?? ''} ${d.registry.get(agentId)?.runtimeRef.name ?? ''} stopped`.replace('  ', ' '); } catch { stopped = 'runtime stop failed'; }
+      try {
+        const done = await Promise.race([d.runtime()?.stop(agentId).then(() => true), sleep(2000).then(() => false)]);
+        if (d.runtime()) stopped = done ? `runtime ${d.registry.get(agentId)?.runtimeRef.kind ?? ''} ${d.registry.get(agentId)?.runtimeRef.name ?? ''} stopped`.replace('  ', ' ') : 'runtime stop not confirmed after 2 s';
+      } catch { stopped = 'runtime stop failed'; }
       const version = d.registry.version();
       emit(incident, 'killed', `Killed (${reason}): identity revoked, ${stopped}.`);
       // wait until every live gateway reports it holds the revocation, so the probe tests enforcement rather than propagation lag
@@ -138,13 +142,21 @@ export function createEngine(d: EngineDeps) {
         if (live.length && live.every(a => a.version >= version)) break;
         await sleep(25);
       }
-      let proof: { attemptedTool: string; verdict: Verdict; code: string; receiptId: string } | undefined;
+      const probes: { attemptedTool: string; verdict: Verdict; code: string; receiptId: string }[] = [];
       for (const gw of d.gateways()) {
-        try { const p = await probe(gw, token, agentId, tool, last?.targetAgentId); proof ??= { attemptedTool: tool, ...p }; } catch { /* gateway unreachable: try the next */ }
+        try { probes.push({ attemptedTool: tool, ...(await probe(gw, token, agentId, tool, last?.targetAgentId)) }); } catch { /* gateway unreachable: try the next */ }
       }
-      return emit(incident, 'proof', proof
-        ? `Independent probe replayed ${tool} with the agent's old token: ${proof.verdict.toUpperCase()} (${proof.code}), receipt ${proof.receiptId}.`
-        : 'Probe could not reach any gateway: kill is recorded in the bundle but not proven.', proof ? { proof } : {});
+      // Proof means every reachable gateway answered deny/REVOKED. Anything else is not proof, whatever the bundle says.
+      const bad = probes.find(p => !(p.verdict === 'deny' && p.code === 'REVOKED'));
+      const proof = bad ?? probes[0];
+      const who = fresh ? 'a fresh short-lived token (the old one was about to expire)' : "the agent's old token";
+      const ev = probes.length && !bad
+        ? emit(incident, 'proof', `Independent probe replayed ${tool} with ${who}: ${proof.verdict.toUpperCase()} (${proof.code}), receipt ${proof.receiptId}.`, { proof })
+        : emit(incident, 'kill_unconfirmed', proof
+          ? `KILL NOT PROVEN: the independent probe replayed ${tool} and got ${proof.verdict.toUpperCase()} (${proof.code}), not DENY (REVOKED), receipt ${proof.receiptId}. The agent may still be acting. Treat as live and escalate.`
+          : 'KILL NOT PROVEN: the probe could not reach any gateway. The revocation is in the bundle but unverified. Treat the agent as live and escalate.', proof ? { proof } : {});
+      if (ev.stage === 'kill_unconfirmed') incident.killP = undefined; // allow a retry
+      return ev;
     })();
     return incident.killP;
   }
