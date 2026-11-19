@@ -1,5 +1,5 @@
 // FIXTURE DATA: scripted and simulated stream messages used only with ?fixture=1. Not real measurements.
-import type { ActionEvent, DrillResult, FleetSummary, IncidentEvent, IncidentStage, StreamMessage } from '../../../contracts/types';
+import type { ActionEvent, AgentRecord, DrillResult, FleetSummary, GateCheck, IncidentEvent, IncidentStage, LifecycleState, PromotionResult, StreamMessage } from '../../../contracts/types';
 import { FIXTURE_AGENTS } from './FIXTURE_agents';
 import { FIXTURE_IMPACT } from './FIXTURE_impact';
 
@@ -142,4 +142,38 @@ export function fixtureDrill(name: string, mode: 'governed' | 'ungoverned', t0: 
     msgs.push({ type: 'action', data: probe }, inc(id, agentId, 'proof', t0 + stages.proof!, `Probe tried ${probe.tool} as ${agentId}: denied (REVOKED).`, { proof: { attemptedTool: probe.tool, verdict: 'deny', code: 'REVOKED', receiptId: probe.receiptId } }));
   }
   return { msgs, result: { drill: name, mode, agentId, startedAt: t0, durationMs: end, spendUsd: +spend.toFixed(2), calls, stages, timeToContainMs: gov ? stages.proof! : null, detected: gov, hardContained: gov } };
+}
+
+// ---- release drills and promotion (FIXTURE answers: same shape as the real API, invented numbers) ----
+const FX = (checks: GateCheck[]) => checks;
+const RELEASE_GATES = (bad: boolean): GateCheck[] => FX([
+  { name: 'Lifecycle step', passed: true, detail: 'canary to production is the next step' },
+  { name: 'Evaluation evidence', passed: true, detail: 'passing evaluation from 2026-05-20 (FIXTURE)' },
+  { name: 'Drill regression', passed: true, detail: 'every runaway drill was contained (FIXTURE)' },
+  { name: 'Attack suite', passed: true, detail: '0 of 9 attacks escaped containment (FIXTURE)' },
+  { name: 'Canary analysis', passed: !bad, detail: bad ? 'error rate 33.3% on the new version vs 0.0% on stable (limit: stable + 5 points) (FIXTURE)' : 'error rate 0.0% vs 0.0% on stable and p99 within limits (FIXTURE)' },
+  { name: 'Error budget', passed: true, detail: 'only 18 decisions on record (fewer than 20), so the budget is not exhausted (FIXTURE)' },
+]);
+export function fixtureRelease(name: string, t0: number): { msgs: StreamMessage[]; result: DrillResult } {
+  const bad = name === 'bad-release', agentId = 'invoice-recon', id = `inc-fixture-${name}`;
+  const decide = bad ? 3200 : 4600, end = decide + 400;
+  const msgs: StreamMessage[] = [inc(id, agentId, 'canary_started', t0, "Canary started: v1.1.0 takes 50% of invoice-recon's traffic; v1.0.0 stays stable. (FIXTURE)")];
+  if (bad) msgs.push(inc(id, agentId, 'detected', t0 + decide - 100, 'Canary analysis failed: error rate 33.3% on the new version vs 0.0% on stable. (FIXTURE)'), inc(id, agentId, 'rolled_back', t0 + decide, 'Rolled back automatically: canary v1.1.0 stopped, all traffic back on v1.0.0. The record stays at v1.0.0. (FIXTURE)'));
+  else msgs.push(inc(id, agentId, 'promoted', t0 + decide, 'Promoted automatically: v1.1.0 passed all 6 gates and is now the production version of invoice-recon. (FIXTURE)'));
+  const stages = bad ? { canary_started: 0, detected: decide - 100, rolled_back: decide } : { canary_started: 0, promoted: decide };
+  return { msgs, result: { drill: name, mode: 'governed', agentId, startedAt: t0, durationMs: end, spendUsd: 0, calls: 20, stages, timeToContainMs: null, detected: bad, hardContained: false, outcome: bad ? 'rolled_back' : 'promoted', timeToRollbackMs: bad ? decide : null, gates: RELEASE_GATES(bad) } };
+}
+const NEXT: Partial<Record<LifecycleState, LifecycleState>> = { draft: 'shadow', shadow: 'canary', canary: 'production' };
+/** Mirrors the shape of services/control/src/lifecycle.ts evaluatePromotion; only the evaluation and step gates are computed, the measured-evidence gates are labelled FIXTURE. */
+export function fixturePromote(r: AgentRecord, to: LifecycleState): PromotionResult {
+  const from = r.lifecycleState, checks: GateCheck[] = [];
+  const stepOk = to === 'retired' ? from !== 'retired' : NEXT[from] === to;
+  checks.push({ name: 'Lifecycle step', passed: stepOk, detail: stepOk ? `${from} to ${to} is the next step` : `${from} cannot move to ${to}; the only forward step from ${from} is ${NEXT[from] ?? 'none'}` });
+  if (stepOk && (to === 'canary' || to === 'production')) {
+    const e = r.evaluation;
+    checks.push({ name: 'Evaluation evidence', passed: !!e?.passed, detail: !e ? `no evaluation evidence on file — ${to} needs a passing evaluation` : e.passed ? `passing evaluation from ${e.date}` : `the evaluation on file (${e.date}) failed — ${to} needs a passing evaluation` });
+    if (to === 'production') checks.push(...RELEASE_GATES(false).slice(2));
+  }
+  const failed = checks.filter((c) => !c.passed);
+  return { allowed: !failed.length, from, to, checks, reason: failed.length ? `Blocked: ${failed[0].detail}` : `Allowed: '${r.id}' may move from ${from} to ${to}; all ${checks.length} gates passed. (FIXTURE answer)` };
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowDownUp, Search } from 'lucide-react';
 import type { AgentRecord } from '../../../contracts/types';
 import { useStore } from '../store';
+import { setUi } from '../ui-state';
 import { Initials, StateIcon, StateMark, ownerShort, type AgentState } from '../ui';
 
 type Key = 'name' | 'team' | 'risk' | 'life' | 'eval';
@@ -34,7 +35,7 @@ export function Registry() {
               <tr key={a.id}>
                 <td><a href={`#/agent/${a.id}`} className="strong">{a.name}</a><br /><span className="measured muted">{a.id}</span></td>
                 <td><span className="owner"><Initials name={a.owner.name} size={26} />{ownerShort(a.owner.name)}</span><br /><span className="muted">{a.owner.team}</span></td>
-                <td>{a.riskRating}</td><td>{a.lifecycleState}</td>
+                <td>{a.riskRating}</td><td>{a.lifecycleState}{a.lifecycleState !== 'retired' && a.lifecycleState !== 'production' && <><br /><a className="strong" href={`#/agent/${a.id}`} onClick={() => setUi({ agentTab: 'lifecycle' })}>Promote</a></>}</td>
                 <td>{a.evaluation ? <span className={`evalmark ${a.evaluation.passed ? 'is-ok' : 'is-bad'}`}><StateIcon state={a.evaluation.passed ? 'healthy' : 'alert'} />{a.evaluation.passed ? 'Passed' : 'Failed'}</span> : <span className="evalmark is-bad"><StateIcon state="alert" />None on record</span>}</td>
                 <td>{states?.[a.id] ? <StateMark state={states[a.id] as AgentState} /> : <span className="muted">no data</span>}</td>
                 <td className="measured">{a.scopes.tools.length}</td>

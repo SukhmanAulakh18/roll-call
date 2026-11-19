@@ -7,6 +7,7 @@ import { Octagon, Pause, Play, Siren, X } from 'lucide-react';
 import type { ActionEvent } from '../../../contracts/types';
 import { getState, runDrill, useStore, verifyReceipts } from '../store';
 import { setUi, useUi } from '../ui-state';
+import { Lifecycle } from '../gates';
 import { Assumption, CountUp, Initials, Measured, NotMeasured, Sparkline, StateMark, Tip, VerdictChip, VerifyButton, clock, groupIncidents, isNum, ownerShort, secs, useLocal, usd, type AgentState } from '../ui';
 import { Panel } from '../components';
 import { Suspense, lazy } from 'react';
@@ -191,6 +192,7 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
   const actions = useStore((s) => s.actions);
   const incidents = useStore((s) => s.incidents);
   const impact = useStore((s) => s.impact);
+  const tab = useUi((u) => u.agentTab);
   const reduce = useReducedMotion();
   if (!a) return <aside className="side"><button className="btn btn--icon side-x" onClick={onClose} aria-label="Close agent panel"><X size={16} aria-hidden /></button><p className="empty">No agent called <code className="measured">{id}</code> is loaded.</p></aside>;
   const mine = actions.filter((x) => x.agentId === id);
@@ -213,9 +215,9 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
       <div className="side-state"><StateMark state={state} /><span className="chip">{a.lifecycleState}</span><span className="chip">{a.riskRating} risk</span></div>
       <p className="side-purpose">{a.purpose}</p>
       <button className="btn btn--danger btn--block" onClick={() => setUi({ killId: a.id })} disabled={state === 'killed'}><Octagon size={16} aria-hidden />{state === 'killed' ? 'Already stopped' : 'Stop this agent'}</button>
-      <Tabs.Root defaultValue="now" className="tabs">
+      <Tabs.Root value={tab} onValueChange={(v) => setUi({ agentTab: v as typeof tab })} className="tabs">
         <Tabs.List className="tabs-l" aria-label="Agent detail">
-          <Tabs.Trigger value="now">Now</Tabs.Trigger><Tabs.Trigger value="touch">What it can touch</Tabs.Trigger><Tabs.Trigger value="record">Record</Tabs.Trigger>
+          <Tabs.Trigger value="now">Now</Tabs.Trigger><Tabs.Trigger value="touch">What it can touch</Tabs.Trigger><Tabs.Trigger value="record">Record</Tabs.Trigger><Tabs.Trigger value="lifecycle">Lifecycle</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="now" className="tabs-c">
           <dl>
@@ -246,6 +248,7 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
             <Row k="Reviewed by">{a.reviewer}, approved by {a.approver}</Row>
           </dl>
         </Tabs.Content>
+        <Tabs.Content value="lifecycle" className="tabs-c"><Lifecycle key={a.id} agent={a} /></Tabs.Content>
       </Tabs.Root>
     </motion.aside>
   );

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
-import type { ActionEvent, AdmissionResult, AgentRecord, DrillResult, FleetSummary, IncidentEvent, StreamMessage } from '../../contracts/types';
+import type { ActionEvent, AdmissionResult, AgentRecord, DrillResult, FleetSummary, IncidentEvent, LifecycleState, PromotionResult, StreamMessage } from '../../contracts/types';
 import { FIXTURE_IMPACT } from './fixtures/FIXTURE_impact';
 import { FIXTURE_AGENTS } from './fixtures/FIXTURE_agents';
-import { chainAction, fixtureBaseline, fixtureDrill, fixtureFleet, fixtureProbe, startFixtureSim, verifyFixtureChain } from './fixtures/FIXTURE_stream';
+import { chainAction, fixtureBaseline, fixtureDrill, fixtureFleet, fixtureProbe, fixturePromote, fixtureRelease, startFixtureSim, verifyFixtureChain } from './fixtures/FIXTURE_stream';
 
 export const FIXTURE = new URLSearchParams(location.search).get('fixture') === '1';
 export type Impact = Record<string, any>;
@@ -175,7 +175,7 @@ export async function runDrill(name: string, ab: boolean) {
       const t0 = Date.now();
       run.starts[mode] = t0; run.phase = mode; set({ drillRun: { ...run } });
       let res: DrillResult;
-      if (FIXTURE) { const f = fixtureDrill(name, mode, t0); playAbs(f.msgs); await sleep(f.result.durationMs + 300); res = f.result; }
+      if (FIXTURE) { const f = name.endsWith('-release') ? fixtureRelease(name, t0) : fixtureDrill(name, mode, t0); playAbs(f.msgs); await sleep(f.result.durationMs + 300); res = f.result; }
       else res = await postJSON(`/v1/drills/${name}`, { mode });
       run.results = [...run.results, res]; set({ drillRun: { ...run } });
     }
@@ -190,6 +190,22 @@ export async function resetDrills() {
   timers.forEach(clearTimeout); timers = [];
   set({ drillRun: note ? { name: '', ab: false, phase: 'error', starts: {}, results: [], error: note } : null, incidents: [], actions: state.actions.filter((a) => !a.agentId.startsWith('__')) });
   if (FIXTURE) { stopSim?.(); ingest(fixtureFleet()); stopSim = startFixtureSim(ingest, () => state.actions, () => state.fleet); }
+}
+
+/** POST /v1/agents/:id/promote. 200 (allowed) and 409 (blocked) both carry the PromotionResult; dryRun only evaluates the gates. */
+export async function promoteAgent(id: string, to: LifecycleState, dryRun: boolean): Promise<PromotionResult> {
+  if (FIXTURE) {
+    await sleep(350);
+    const rec = state.agents.find((x) => x.id === id); if (!rec) throw new Error(`no agent '${id}'`);
+    const res = fixturePromote(rec, to);
+    if (res.allowed && !dryRun) set({ agents: state.agents.map((x) => (x.id === id ? { ...x, lifecycleState: to } : x)) });
+    return { ...res, dryRun };
+  }
+  const r = await fetch(`/v1/agents/${encodeURIComponent(id)}/promote${dryRun ? '?dryRun=1' : ''}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ to }) });
+  const j = await r.json().catch(() => null);
+  if (!j || typeof j !== 'object' || !Array.isArray(j.checks)) throw new Error((j && j.error) || `HTTP ${r.status}`);
+  if (j.allowed && !dryRun) void loadAgents(['/v1/agents']);
+  return j as PromotionResult;
 }
 
 export async function killAgent(id: string): Promise<IncidentEvent> {

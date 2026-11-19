@@ -10,8 +10,9 @@ export interface U {
   verify: VerifySpec | null;
   lens: 'exec' | 'ops' | 'eng';
   presenter: boolean;
+  agentTab: 'now' | 'touch' | 'record' | 'lifecycle';   // which tab the agent panel opens on
 }
-let u: U = { killId: null, palette: false, tour: null, receipt: null, verify: null, lens: 'exec', presenter: false };
+let u: U = { killId: null, palette: false, tour: null, receipt: null, verify: null, lens: 'exec', presenter: false, agentTab: 'now' };
 const subs = new Set<() => void>();
 export const setUi = (p: Partial<U>) => { u = { ...u, ...p }; subs.forEach((f) => f()); };
 export const getUi = () => u;

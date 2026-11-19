@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react';
 import { animate, motion, useReducedMotion } from 'motion/react';
-import { Check, CircleDashed, Flame, Play, RotateCcw, Rewind, Repeat2, ShieldQuestion } from 'lucide-react';
+import { Check, CircleDashed, Flame, PackageCheck, PackageX, Play, RotateCcw, Rewind, Repeat2, ShieldQuestion } from 'lucide-react';
 import type { ActionEvent, DrillResult, IncidentStage } from '../../../contracts/types';
 import { FIXTURE, resetDrills, runDrill, useStore, type DrillRun } from '../store';
 import { FixtureChip, Measured, StateMark, groupIncidents, ownerShort, secs, useNow, usd, type AgentState } from '../ui';
 import { KillUnconfirmed, Panel, ProofCard } from '../components';
 import { FleetMap } from './FleetMap';
+import { ReleaseView } from './ReleaseDrill';
 
 const DRILLS = [
-  { name: 'runaway-loop', ab: true, label: 'Runaway loop', icon: Flame, note: 'An agent retries the same call in a tight loop. Run it with and without controls and race the spend.', agent: 'invoice-recon', involved: ['invoice-recon'] },
-  { name: 'ping-pong', ab: false, label: 'Agent ping-pong', icon: Repeat2, note: 'Two agents call each other forever. The loop lights up on the map.', agent: 'limits-checker', involved: ['limits-checker', 'credit-memo'] },
-  { name: 'scope-drift', ab: false, label: 'Scope drift', icon: ShieldQuestion, note: 'An agent reaches for a tool it was never given. A dashed drift edge pulses.', agent: 'support-summarizer', involved: ['support-summarizer'] },
+  { name: 'runaway-loop', ab: true, label: 'Runaway loop', icon: Flame, note: 'An agent retries the same call in a tight loop. Run it with and without controls and race the spend.', agent: 'invoice-recon', involved: ['invoice-recon'], release: false },
+  { name: 'ping-pong', ab: false, label: 'Agent ping-pong', icon: Repeat2, note: 'Two agents call each other forever. The loop lights up on the map.', agent: 'limits-checker', involved: ['limits-checker', 'credit-memo'], release: false },
+  { name: 'scope-drift', ab: false, label: 'Scope drift', icon: ShieldQuestion, note: 'An agent reaches for a tool it was never given. A dashed drift edge pulses.', agent: 'support-summarizer', involved: ['support-summarizer'], release: false },
+  { name: 'bad-release', ab: false, label: 'Bad release', icon: PackageX, note: 'A new version of invoice-recon ships with a fault. It runs as a canary, fails analysis and is rolled back with no human.', agent: 'invoice-recon', involved: ['invoice-recon'], release: true },
+  { name: 'good-release', ab: false, label: 'Good release', icon: PackageCheck, note: 'The control case: a healthy new version must be promoted, not rolled back.', agent: 'invoice-recon', involved: ['invoice-recon'], release: true },
 ] as const;
 const WARMUP_GUESS = 5000; // sim/drills.ts WARMUP_MS: the real drill warms the fleet up for 5 s before injecting the fault
 const STEPS: { stage: IncidentStage; label: string; plain: string }[] = [
@@ -116,6 +119,7 @@ export function Drill() {
       {active?.phase === 'error' && <p className="note-bad" role="alert">The drill did not finish: {active.error}</p>}
       {!active && <p className="muted">Pick a drill and run it. The real drill warms the fleet for a few seconds, injects the fault, then holds a fixed window.</p>}
 
+      {d.release ? <ReleaseView name={d.name as 'bad-release' | 'good-release'} run={run} /> : <>
       <div className={`race-grid ${d.ab ? '' : 'race-grid--one'}`} data-tour="race">
         {d.ab && <RaceChart title="Ungoverned" tone="bad" pts={A} max={max} maxT={maxT} ph={ph} state={ungovRes ? `${secs(ungovRes.durationMs)} window, ${ungovRes.calls} calls` : active?.phase === 'ungoverned' ? 'running now' : 'not run yet'} note="Same fault, no controls: the agent keeps calling until the window ends." />}
         <RaceChart title={d.ab ? 'Governed' : 'With controls'} tone="cool" pts={B} max={max} maxT={maxT} ph={ph} marks={marks} state={govRes ? `${secs(govRes.durationMs)} window, ${govRes.calls} calls` : active?.phase === 'governed' ? 'running now' : 'not run yet'} note={d.name === 'scope-drift' ? 'Spend stays flat because every out-of-scope call is denied at the gateway.' : 'Same fault, controls on: slowed, paged, then stopped.'} />
@@ -142,6 +146,7 @@ export function Drill() {
           <OwnerLine agentId={d.agent} />
         </div>
       </div>
+      </>}
     </div>
   );
 }

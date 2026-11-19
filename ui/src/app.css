@@ -422,3 +422,18 @@ dl { margin: 0; }
 .intro-t { margin: 0; font-size: 1.15rem; line-height: 1.4; max-width: 46rem; color: var(--color-ink); }
 .map-frame--home { height: 420px; }
 @media (max-width: 700px) { .map-frame--home { height: 420px; } }
+
+/* ---------- lifecycle and promotion gates ---------- */
+.gates { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-xs); }
+.gates li { display: grid; grid-template-columns: 22px 9rem 1fr; gap: var(--space-3xs) var(--space-sm); align-items: start; padding: var(--space-sm); border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-pill); background: var(--color-paper-3); font-size: 0.8125rem; }
+.gates .g-i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: var(--rule-hair) solid var(--color-rule-2); }
+.gates .g-d { color: var(--color-muted); line-height: 1.4; }
+.gates li.is-ok { border-color: var(--color-ok); } .gates li.is-ok .g-i { background: var(--color-ok); border-color: var(--color-ok); color: var(--color-paper); }
+.gates li.is-bad { border-color: var(--color-bad); } .gates li.is-bad .g-i { background: var(--color-bad); border-color: var(--color-bad); color: var(--color-paper); } .gates li.is-bad .g-d { color: var(--color-ink-2); }
+.theatre--release { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.track { list-style: none; margin: 0 0 var(--space-sm); padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+.track li { padding: var(--space-3xs) var(--space-xs); border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-pill); font-size: 0.8125rem; color: var(--color-muted); }
+.track li.is-past { color: var(--color-ink-2); border-color: var(--color-rule-2); } .track li.is-now { color: var(--color-accent-ink); background: var(--color-accent); border-color: var(--color-accent); font-weight: 500; }
+.lc-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin: var(--space-sm) 0; } .lc-res { margin-top: var(--space-sm); }
+@media (max-width: 900px) { .theatre--release { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .gates li { grid-template-columns: 22px 1fr; } .gates .g-d { grid-column: 2; } }
