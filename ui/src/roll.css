@@ -188,5 +188,11 @@ h2 { font-size: 1.45rem; letter-spacing: 0.01em; font-weight: 700; } h3 { font-s
 .is-zoomed .sweep, .is-zoomed .ring-inner, .is-zoomed .ring-outer, .is-zoomed .ring-track, .is-zoomed .tick { display: none; }
 .roll--compact { max-height: 420px; }
 .theatre-ringbox { overflow: hidden; border-radius: 12px; }
-/* keep the top bar on one row on laptop/projector widths; nav scrolls if it must */
-@media (min-width: 901px) { .topbar-in { flex-wrap: nowrap; } .nav a { padding: 0 var(--space-xs); } .topbar-r { flex-wrap: nowrap; } }
+/* Top bar: one row on wide screens; below 1500px a deliberate two-tier header (brand + tools, then full-width nav tabs) */
+.topbar > .topbar-in { flex-wrap: nowrap; }
+.topbar > .topbar-in > .topbar-r { flex-wrap: nowrap; }
+@media (max-width: 1499px) {
+  .topbar > .topbar-in { flex-wrap: wrap; row-gap: 0; padding-block: var(--space-2xs) 0; }
+  .topbar > .topbar-in > .nav { order: 3; flex: 1 0 100%; margin-inline: calc(-1 * var(--space-xs)); border-top: var(--rule-hair) solid var(--color-rule); }
+  .topbar > .topbar-in > .topbar-r { margin-left: auto; }
+}

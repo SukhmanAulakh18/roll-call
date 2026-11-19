@@ -50,9 +50,15 @@ function RaceChart({ title, tone, pts, max, maxT, ph, marks = [], state, note }:
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}: cumulative spend ${last ? usd(last.v) : 'none yet'} after ${last ? last.t.toFixed(1) : '0'} seconds`}>
         {[0, 0.5, 1].map((f) => (<g key={f}><line x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} className="grid" /><text x={L - 8} y={y(max * f) + 4} textAnchor="end" className="axis">{usd(max * f)}</text></g>))}
         {[0, 0.5, 1].map((f) => <text key={f} x={x(maxT * f)} y={H - 8} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'} className="axis">{(maxT * f).toFixed(0)} s</text>)}
-        {marks.filter((m) => ph == null || m.t <= ph).map((m, mi) => { const right = x(m.t) > W - R - 80; return (<g key={m.text}><line x1={x(m.t)} x2={x(m.t)} y1={T} y2={H - B} className="mark" /><text x={right ? x(m.t) - 5 : x(m.t) + 5} textAnchor={right ? 'end' : 'start'} y={T + 12 + mi * 18} className="mark-t">{m.text}</text></g>); })}
+        {marks.filter((m) => ph == null || m.t <= ph).map((m, mi, all) => {
+          // first mark labels to the LEFT of its line, later ones to the RIGHT, so close marks never collide; clamp to the plot
+          const left = (mi === 0 && all.length > 1 && x(m.t) > L + 70) || x(m.t) > W - R - 80;
+          const firstLeft = all.length > 1 && x(all[0].t) > L + 70;
+          const drop = mi > 0 && !firstLeft && x(m.t) - x(all[mi - 1].t) < 80 ? 18 * mi : 0; // no room on the left: stack close labels
+          return (<g key={m.text}><line x1={x(m.t)} x2={x(m.t)} y1={T} y2={H - B} className="mark" /><text x={left ? x(m.t) - 6 : x(m.t) + 6} textAnchor={left ? 'end' : 'start'} y={T + 12 + drop} className="mark-t">{m.text}</text></g>);
+        })}
         {shown.length > 1 && <><path d={`${d}L${x(last.t).toFixed(1)},${y(0)}L${x(0)},${y(0)}Z`} className="area" /><path d={d} className="line" /></>}
-        {last && <><circle cx={x(last.t)} cy={y(last.v)} r="5" className="dot" /><text x={Math.min(x(last.t) - 8, W - R - 4)} y={y(last.v) < T + 26 ? y(last.v) + 22 : y(last.v) - 10} textAnchor="end" className="endlabel">{usd(last.v)}</text></>}
+        {last && <><circle cx={x(last.t)} cy={y(last.v)} r="5" className="dot" /><text x={Math.min(x(last.t) - 8, W - R - 4)} y={y(last.v) - 10 < T + 30 ? y(last.v) + 22 : y(last.v) - 10} textAnchor="end" className="endlabel">{usd(last.v)}</text></>}
       </svg>
       {note && <p className="race-note">{note}</p>}
     </figure>
