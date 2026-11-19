@@ -134,3 +134,14 @@ Start with `docs/architecture.md`, then `docs/adr/README.md`.
 | SPIFFE / SPIRE | TBD | TBD |
 
 Licences are to be verified before adoption. Do not treat this table as final.
+
+## Deploy
+
+**Live app (one container, whole stack).** `deploy/Dockerfile.web` builds the UI and runs control, gateway, tools and the simulated fleet in one process, serving the UI and API on `$PORT`.
+
+- Render: Dashboard → New → Blueprint → pick this repo (`render.yaml`). Free plan; health check `/healthz`.
+- Any container host: `docker build -f deploy/Dockerfile.web -t roll-call . && docker run -p 7100:7100 roll-call`, then open http://localhost:7100.
+
+Free hosts sleep when idle, so the first request after a pause can take ~30–60 s, and state resets on restart (the fleet always boots healthy). For the event itself, run it locally with `make demo` — it is offline-first.
+
+**Replay (static).** Settings → Pages → Source: GitHub Actions; the `pages` workflow then publishes `make replay` output to https://sukhmanaulakh18.github.io/roll-call/.

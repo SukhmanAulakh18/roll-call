@@ -1,0 +1,10 @@
+# One-click deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: roll-call
+    runtime: docker
+    dockerfilePath: deploy/Dockerfile.web
+    dockerContext: .
+    plan: free
+    healthCheckPath: /healthz
+    autoDeploy: true

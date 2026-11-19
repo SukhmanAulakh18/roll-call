@@ -18,7 +18,8 @@ const keepState = process.argv.includes('--keep-state'); // default: every boot 
 let url = '';
 
 if (!role) {
-  const s = await startStack({ dataDir, ports: { control: 7100, gateway: 7200, tools: 7300 }, uiDir: ui, tickMs: env.RC_TICK_MS ? Number(env.RC_TICK_MS) : undefined }); // RC_TICK_MS=0 disables detection (k6 lab)
+  const s = await startStack({ dataDir, ports: { control: port(7100), gateway: 7200, tools: 7300 }, host: env.HOST, uiDir: ui, // PORT/HOST let a cloud host (e.g. Render) route to control+UI
+    tickMs: env.RC_TICK_MS ? Number(env.RC_TICK_MS) : undefined }); // RC_TICK_MS=0 disables detection (k6 lab)
   if (!keepState) s.control.registry.reset();
   stoppers.push(s.close); url = s.control.url;
   console.log(`Roll Call stack up: control ${s.control.url}  gateway ${s.gateways[0].url}  tools ${s.tools.url}  fleet ${(await s.fleet.running()).length} agents${ui ? `  UI at ${s.control.url}/` : ''}`);
