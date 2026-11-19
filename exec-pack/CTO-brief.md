@@ -69,11 +69,9 @@ Read from the package manifests and installed packages. The backend has no runti
 | `@types/node` | 22.19.1 | MIT | backend dev tooling only (type check) |
 | `qrcode` | 1.5.4 | MIT | backend dev tooling only (type check) |
 | `typescript` | 5.9.3 | Apache-2.0 | backend dev tooling only (type check) |
-| `@fontsource-variable/hanken-grotesk` | 5.3.0 | OFL-1.1 | UI bundle |
-| `@fontsource-variable/host-grotesk` | 5.3.0 | OFL-1.1 | UI bundle |
-| `@fontsource/atkinson-hyperlegible-mono` | 5.3.0 | OFL-1.1 | UI bundle |
-| `@fontsource/instrument-serif` | 5.3.0 | OFL-1.1 | UI bundle |
-| `@fontsource/jetbrains-mono` | 5.3.0 | OFL-1.1 | UI bundle |
+| `@fontsource-variable/big-shoulders-display` | 5.3.0 | OFL-1.1 | UI bundle |
+| `@fontsource-variable/instrument-sans` | 5.3.0 | OFL-1.1 | UI bundle |
+| `@fontsource-variable/martian-mono` | 5.3.0 | OFL-1.1 | UI bundle |
 | `@radix-ui/react-dialog` | 1.3.1 | MIT | UI bundle |
 | `@radix-ui/react-slider` | 1.6.1 | MIT | UI bundle |
 | `@radix-ui/react-tabs` | 1.2.1 | MIT | UI bundle |
@@ -87,6 +85,7 @@ Read from the package manifests and installed packages. The backend has no runti
 | `react` | 18.3.1 | MIT | UI bundle |
 | `react-dom` | 18.3.1 | MIT | UI bundle |
 | `sonner` | 2.0.8 | MIT | UI bundle |
+| `@axe-core/playwright` | 4.14.0 | MPL-2.0 | UI build tooling |
 | `@types/react` | 18.3.12 | MIT | UI build tooling |
 | `@types/react-dom` | 18.3.1 | MIT | UI build tooling |
 | `@vitejs/plugin-react` | 4.3.4 | MIT | UI build tooling |
