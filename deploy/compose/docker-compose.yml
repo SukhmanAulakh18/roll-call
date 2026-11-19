@@ -1,0 +1,121 @@
+# Roll Call, docker compose topology. Compose is the first step after `make stack` (ADR-010).
+# Validate only: `docker compose -f deploy/compose/docker-compose.yml config`.
+# Each role runs `node scripts/serve.ts --role <role>` from the image built by ./Dockerfile.
+# Ports on the host: control 7100, gateway-1 7200, gateway-2 7201, tools 7300.
+
+x-app: &app
+  build:
+    context: ../..
+    dockerfile: deploy/compose/Dockerfile
+  image: rollcall/app:dev
+  restart: unless-stopped
+  working_dir: /app
+  volumes:
+    - rollcall-data:/data
+  environment: &app-env
+    DATA_DIR: /data
+    NODE_ENV: production
+
+services:
+  tools:
+    <<: *app
+    command: ["node", "scripts/serve.ts", "--role", "tools"]
+    ports:
+      - "7300:7300"
+    environment:
+      <<: *app-env
+      PORT: "7300"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7300/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  control:
+    <<: *app
+    command: ["node", "scripts/serve.ts", "--role", "control", "--ui", "ui/dist"]
+    ports:
+      - "7100:7100"
+    environment:
+      <<: *app-env
+      PORT: "7100"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7100/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  gateway-1:
+    <<: *app
+    command: ["node", "scripts/serve.ts", "--role", "gateway"]
+    depends_on:
+      control:
+        condition: service_healthy
+      tools:
+        condition: service_healthy
+    ports:
+      - "7200:7200"
+    environment:
+      <<: *app-env
+      PORT: "7200"
+      GATEWAY_ID: gw-1
+      CONTROL_URL: http://control:7100
+      TOOLS_URL: http://tools:7300
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7200/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  gateway-2:
+    <<: *app
+    command: ["node", "scripts/serve.ts", "--role", "gateway"]
+    depends_on:
+      control:
+        condition: service_healthy
+      tools:
+        condition: service_healthy
+    ports:
+      - "7201:7200"
+    environment:
+      <<: *app-env
+      PORT: "7200"
+      GATEWAY_ID: gw-2
+      CONTROL_URL: http://control:7100
+      TOOLS_URL: http://tools:7300
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7200/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  fleet:
+    <<: *app
+    command: ["node", "scripts/serve.ts", "--role", "fleet"]
+    depends_on:
+      gateway-1:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+      GATEWAY_URL: http://gateway-1:7200
+      CONTROL_URL: http://control:7100
+
+  valkey:
+    image: valkey/valkey:8.1-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  rollcall-data:
+  valkey-data:
