@@ -34,17 +34,18 @@ ${stamp} ${SIM}
 
 | What | Result | Field in impact.json |
 |---|---|---|
-| Time to contain a runaway agent, p95 (over ${V('drill.runs')} drills) | **${V('drill.timeToContainMs.p95')}** | \`drill.timeToContainMs.p95\` |
+| Time to contain a runaway agent, p95 (over ${V('drill.runs')} drills; includes a SIMULATED owner acknowledgement of ${V('drill.simulatedOwnerAckMs')}) | **${V('drill.timeToContainMs.p95')}** | \`drill.timeToContainMs.p95\` |
+| Of which time to hard throttle and page, p95 (automatic, no human) | **${V('drill.stagesP95Ms.paged')}** | \`drill.stagesP95Ms.paged\` |
 | Spend kept out per runaway drill, mean (${V('drill.spendProtectedUsd.protectedTotal')} across all drills) | **${V('drill.spendProtectedUsd.protectedMean')}** | \`drill.spendProtectedUsd.protectedMean\` |
-| Added decision latency at p99, governed vs ungoverned | **${V('bench.overheadP99Ms')}** | \`bench.overheadP99Ms\` |
+| Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **${V('bench.overheadP99Ms')}** | \`bench.overheadP99Ms\` |
 
-Also measured: ${V('fleet.registered')} agents registered and ${V('fleet.unregisteredRunning')} running without a record; detector precision ${V('detector.precision')} and recall ${V('detector.recall')} with ${V('detector.fp')} false alarms on the labelled drills; low-risk success ratio ${M('control-plane-stop', 'lowRiskDuringOutage.ratio')} while the control plane was stopped. Dollar amounts use price assumptions (\`cost-model.md\`), not real invoices.
+Also measured: ${V('fleet.registered')} agents registered and ${V('fleet.unregisteredRunning')} running without a record; detector precision ${V('detector.precision')} and recall ${V('detector.recall')} for HARD containment with ${V('detector.fp')} hard false alarms, at ${V('detector.runsPerCase')} runs per case (small and scripted); soft alerts, which only throttle gently, appeared in ${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')} negative-case runs; low-risk success ratio ${M('control-plane-stop', 'lowRiskDuringOutage.ratio')} while the control plane was stopped. Dollar amounts use price assumptions (\`cost-model.md\`), not real invoices.
 
 ## Top three risks and what we do about them
 
 1. **The results are from simulation.** Agents are scripted and faults are injected by us. *Mitigation:* the 30-day pilot phase is read-only discovery on real traffic, so baselines come from real agents before any enforcement.
 2. **Failing closed has a business cost.** If the control plane is unreachable, high-risk tools are refused after the policy goes stale. *Mitigation:* low-risk work continued in the game day and high-risk calls were denied on purpose; the staleness limit is a setting the risk owner chooses (\`docs/runbooks/control-plane-down.md\`).
-3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged first. Measured false alarms are ${V('detector.fp')} on the labelled set, which is small and synthetic; the pilot measures this on real traffic.
+3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged first. Measured hard false alarms are ${V('detector.fp')} on the labelled set (${V('detector.runsPerCase')} runs per case, small and synthetic), and soft alerts appeared in ${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')} negative-case runs; the pilot measures this on real traffic.
 
 ## Build, buy or extend
 
@@ -88,13 +89,18 @@ Full diagrams: [\`docs/architecture.md\`](../docs/architecture.md). In short: a 
 ## Non-functional requirements: target vs measured
 
 ${table(['Requirement', 'Target', 'Measured', 'Field'], [
-  ['Gateway decision path p99', `at most ${V('bench.targetDecisionP99Ms')}`, V('bench.governed.p99'), '`bench.governed.p99`'],
-  ['Overhead vs ungoverned, p99 (end to end)', 'not set', V('bench.overheadP99Ms'), '`bench.overheadP99Ms`'],
+  ['Gateway decision path p99 (in-process timer around the decision code only; excludes I/O and TLS)', `at most ${V('bench.targetDecisionP99Ms')}`, V('bench.governed.p99'), '`bench.governed.p99`'],
+  ['End-to-end p99, governed (loopback, no TLS, single process)', 'not set', V('bench.governed.endToEnd.p99'), '`bench.governed.endToEnd.p99`'],
+  ['End-to-end p99, ungoverned (same setup)', 'not set', V('bench.direct.endToEnd.p99'), '`bench.direct.endToEnd.p99`'],
+  ['Overhead = difference of the two end-to-end p99s above. Not production latency', 'not set', V('bench.overheadP99Ms'), '`bench.overheadP99Ms`'],
   ['Time to detect, p95', `at most ${V('drill.budgetsMs.detect')}`, V('drill.stagesP95Ms.detected'), '`drill.stagesP95Ms.detected`'],
   ['Time to contain, p95 (over ' + V('drill.runs') + ' drills)', `at most ${V('drill.budgetsMs.containP95')}`, V('drill.timeToContainMs.p95'), '`drill.timeToContainMs.p95`'],
+  ['Time to hard throttle and page, p95 (automatic part)', 'not set', V('drill.stagesP95Ms.paged'), '`drill.stagesP95Ms.paged`'],
+  ['Simulated owner acknowledgement included in time to contain', 'configured', V('drill.simulatedOwnerAckMs'), '`drill.simulatedOwnerAckMs`'],
   ['Time to contain, p50', 'not set', V('drill.timeToContainMs.p50'), '`drill.timeToContainMs.p50`'],
   ['Spend kept out per runaway drill, mean', 'not set', V('drill.spendProtectedUsd.protectedMean'), '`drill.spendProtectedUsd.protectedMean`'],
-  ['Detector false alarms / missed', 'none', `${V('detector.fp')} / ${V('detector.fn')}`, '`detector.fp`, `detector.fn`'],
+  ['Detector HARD false alarms / missed (n = ' + V('detector.runsPerCase') + ' runs per case)', 'none', `${V('detector.fp')} / ${V('detector.fn')}`, '`detector.fp`, `detector.fn`'],
+  ['Negative-case runs with a soft alert on any agent (soft alerts are not counted as false alarms)', 'not set', `${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')}`, '`detector.softOnNegatives`'],
   ['Data plane availability', '99.95% (target)', 'not measured as a percentage; see game days below', 'docs/availability-model.md'],
   ['Control plane availability', '99.9% (target)', 'not measured as a percentage; see game days below', 'docs/availability-model.md'],
 ])}

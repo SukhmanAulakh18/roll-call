@@ -30,8 +30,11 @@ async function probe(gw: string, token: string, agentId: string, tool: string, t
   return { verdict: b.verdict, code: b.code, receiptId: b.receiptId };
 }
 
+/** Simulated owner auto-acknowledgement delay. Part of every measured time-to-contain. */
+export const DEFAULT_ACK_MS = 1000;
+
 export function createEngine(d: EngineDeps) {
-  const ackMs = d.ackMs ?? 1000, clearMs = d.clearMs ?? 5000;
+  const ackMs = d.ackMs ?? DEFAULT_ACK_MS, clearMs = d.clearMs ?? 5000;
   let detector: Detector = createDetector();
   let ledger: ActionEvent[] = [];
   let log: IncidentEvent[] = [];

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DrillResult, IncidentStage, StreamMessage } from '../contracts/types.ts';
+import { DEFAULT_ACK_MS } from '../services/control/src/engine.ts';
 import { startStack } from '../sim/stack.ts';
 import { DRILLS, WARMUP_MS, WINDOW_MS, runDrill } from '../sim/drills.ts';
 import { PRICE_ASSUMPTIONS, mergeImpact, pct } from './lib/impact.ts';
@@ -59,20 +60,20 @@ for (let i = 0; i < runs; i++) {
 }
 
 // ---- detector evaluation set
-const cases: Record<string, { positive: boolean; runs: number; detected: number; hardContained: number; collateral: number }> = {};
+const cases: Record<string, { positive: boolean; runs: number; detected: number; hardContained: number; collateral: number; anyAlert: number }> = {};
 for (const name of Object.keys(DRILLS)) {
-  const c = cases[name] = { positive: DRILLS[name].positive, runs: 0, detected: 0, hardContained: 0, collateral: 0 };
+  const c = cases[name] = { positive: DRILLS[name].positive, runs: 0, detected: 0, hardContained: 0, collateral: 0, anyAlert: 0 };
   for (let i = 0; i < evalRuns; i++) {
     const s = await startStack({ dataDir: tmp() });
     try {
       const r = await runDrill(s, name, 'governed', { windowMs: 9000 });
-      c.runs++; c.detected += +r.detected; c.hardContained += +r.hardContained; c.collateral += r.collateralIncidents?.length ?? 0;
+      c.runs++; c.detected += +r.detected; c.hardContained += +r.hardContained; c.collateral += r.collateralIncidents?.length ?? 0; c.anyAlert += +(r.detected || !!r.collateralIncidents?.length);
       console.log(`eval ${name} ${i + 1}/${evalRuns}: detected=${r.detected} hard=${r.hardContained} stages=${JSON.stringify(r.stages)}`);
     } finally { await s.close(); }
   }
 }
-let tp = 0, fp = 0, fn = 0, tn = 0;
-for (const c of Object.values(cases)) { if (c.positive) { tp += c.hardContained; fn += c.runs - c.hardContained; } else { fp += c.hardContained; tn += c.runs - c.hardContained; } }
+let tp = 0, fp = 0, fn = 0, tn = 0, negRuns = 0, negAlertRuns = 0;
+for (const c of Object.values(cases)) { if (!c.positive) { negRuns += c.runs; negAlertRuns += c.anyAlert; } if (c.positive) { tp += c.hardContained; fn += c.runs - c.hardContained; } else { fp += c.hardContained; tn += c.runs - c.hardContained; } }
 
 // ---- aggregate
 const samples = gov.map(g => g.timeToContainMs).filter((x): x is number => x !== null);
@@ -87,12 +88,15 @@ const drill = {
   callsMean: { ungoverned: r2(mean(ung.map(u => u.calls)), 1), governed: r2(mean(gov.map(g => g.calls)), 1) },
   timeToContainMs: { p50: Math.round(pct(samples, 50)), p95: Math.round(pct(samples, 95)), max: Math.max(...samples), samples, uncontained: gov.length - samples.length },
   stagesP95Ms: stageP95,
+  simulatedOwnerAckMs: DEFAULT_ACK_MS,   // configured, part of timeToContainMs
   budgetsMs: { detect: 10_000, throttle: 5000, page: 5000, killAndProof: 10_000, containP95: 30_000 },
 };
 const detector = {
   tp, fp, fn, tn, precision: tp + fp ? r2(tp / (tp + fp), 3) : null, recall: tp + fn ? r2(tp / (tp + fn), 3) : null,
-  definition: '"Hard containment fired" (hard throttle or kill). Positives: runaway-loop, ping-pong, scope-drift. Negatives: healthy-burst, slow-repeat, normal (any hard incident on any agent counts as a false positive).',
+  definition: 'HARD containment only: "hard containment fired" (hard throttle or kill), n = runsPerCase per case. Positives: runaway-loop, ping-pong, scope-drift. Negatives: healthy-burst, slow-repeat, normal (any hard incident on any agent counts as a false positive).',
   runsPerCase: evalRuns, cases,
+  // Soft alerts (one signal: gentle throttle, no page) on any agent during a negative case. Hard ones are the fp above; soft ones are not counted as false alarms.
+  softOnNegatives: { runs: negRuns, runsWithAlert: negAlertRuns },
 };
 if (!only) {
   mergeImpact({ fleet, drill, detector, assumptions: await PRICE_ASSUMPTIONS() });

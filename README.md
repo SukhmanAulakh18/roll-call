@@ -56,13 +56,24 @@ To run the containers instead: `make compose-up`, then `make compose-down` to st
 | `make chaos` | Five game days (control stop, issuer down, gateway loss, bad bundle, event backlog); writes the `chaos` section of `impact.json` |
 | `make exec-pack` | Render `exec-pack/` (briefs, verification matrix, threat model, E-23 mapping) from `impact.json` |
 | `make verify` | Runs `exec-pack` first, then chain verification, tamper test, every verification-matrix command, schema check and forbidden-strings scan |
-| `make replay` | Build the static Replay page from the last recorded run |
+| `make replay` | Build a self-contained static Replay bundle in `dist-replay/` (open `#/replay`); `.github/workflows/pages.yml` publishes it to GitHub Pages so a QR code can open it on a phone |
 | `make compose-up` / `make compose-down` | Docker compose stack, up and down |
 | `make kind-up` | kind cluster with the AgentRecord CRD and admission webhook (planned) |
 | `make admission-demo` | Try to run an unregistered agent in kind (planned) |
 | `make clean` | Remove `data` and `ui/dist` |
 
-Status: the code is still being built. Several targets depend on files that do not exist yet. The table is the intended interface, and the API is in `contracts/modules.md`.
+The API is in `contracts/modules.md`. `make kind-up` and `make admission-demo` ran once against a real kube-apiserver; see ADR-013 for what was and was not exercised.
+
+### How to read the numbers
+
+Every figure comes from `impact.json`, written by a real run. Read them with these labels:
+
+- **Overhead** is the difference of two end-to-end p99s (governed minus ungoverned), measured over loopback, plain HTTP, no TLS, in one process on one machine. It is not production latency.
+- **Decision path p99** is an in-process timer around the decision code only.
+- **Time to contain** includes a simulated owner acknowledgement (the configured delay is stored as `drill.simulatedOwnerAckMs`). The automatic part, time to hard throttle and page, is `drill.stagesP95Ms.paged`. Percentiles are over the recorded `drill.runs`.
+- **Detector precision and recall** are for HARD containment only, with `detector.runsPerCase` runs per case. Soft alerts on negative cases are reported separately as `detector.softOnNegatives`.
+- A kill counts as proven only when an independent probe gets DENY with code REVOKED; otherwise the incident stage is `kill_unconfirmed`.
+- `/v1/direct` (the ungoverned baseline) is off unless `RC_DIRECT_BASELINE=1` (ADR-001).
 
 ## Repo map
 
