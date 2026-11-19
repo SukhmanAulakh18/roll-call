@@ -1,0 +1,46 @@
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+@import '@fontsource-variable/hanken-grotesk/index.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@xyflow/react/dist/base.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root, :root[data-theme='dark'] {
+  --bg: #10151b; --surface: #161d25; --raised: #1d2630; --line: #2c3743;
+  --ink: #e8ecf0; --mute: #9fadbb; --accent: #ffb02e; --accent-ink: #1a1200;
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  --bg: #f2f4f6; --surface: #ffffff; --raised: #e9edf1; --line: #cfd6dd;
+  --ink: #131d27; --mute: #4a5967; --accent: #a84a00; --accent-ink: #ffffff;
+  color-scheme: light;
+}
+html { font-size: 17px; }
+html.presenter { font-size: 23px; }
+body { background: var(--bg); color: var(--ink); font-family: 'Hanken Grotesk Variable', system-ui, sans-serif; line-height: 1.5; padding-bottom: 5.5rem; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; box-shadow: 0 0 0 6px var(--bg); border-radius: 4px; }
+
+@layer components {
+  .btn { @apply inline-flex items-center gap-2 rounded-md border border-line bg-surface px-4 py-2 text-[0.95rem] font-medium text-ink hover:bg-raised disabled:opacity-50 disabled:cursor-not-allowed; min-height: 44px; }
+  .btn-accent { @apply border-accent bg-accent text-accent-ink hover:bg-accent hover:brightness-110; }
+  .btn-link { @apply underline underline-offset-4 decoration-line hover:decoration-ink; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-[0.8rem] text-mute; }
+  .chip-assume { @apply border-dashed border-accent text-accent font-semibold; }
+  .field { @apply rounded-md border border-line bg-bg px-3 py-2 text-ink; min-height: 44px; }
+  .h-display { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: -0.01em; line-height: 1.02; }
+  .panel { @apply rounded-lg border border-line bg-surface p-6; }
+  .th { @apply text-left font-medium text-mute text-[0.85rem] py-2 pr-4 border-b border-line; }
+  .td { @apply py-3 pr-4 border-b border-line align-top; }
+}
+.react-flow__node { cursor: pointer; }
+.react-flow__attribution { display: none; }
+.react-flow__edge-path { stroke: var(--line); stroke-width: 1.4; }
+.react-flow__edge.hot .react-flow__edge-path { stroke: var(--ink); stroke-width: 2; }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--accent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+.pulse { animation: pulse-ring 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+main:focus-visible { outline: none; box-shadow: none; }
+.react-flow { background: var(--surface); }
+.react-flow, .react-flow__pane, .react-flow__renderer { background: var(--surface) !important; }
