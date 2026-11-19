@@ -13,7 +13,7 @@ The agents, tools and model responses are simulated. The controls are not. The g
 
 [![Roll Call demo: a runaway agent is detected, throttled, paged, killed and proven stopped](docs/media/roll-call-poster.png)](https://sukhmanaulakh18.github.io/roll-call/video.html)
 
-Recorded from a real run with `make video`. [Play the video](https://sukhmanaulakh18.github.io/roll-call/video.html) · [interactive replay](https://sukhmanaulakh18.github.io/roll-call/#/replay) · [mp4](docs/media/roll-call-demo.mp4)
+Recorded from a real run with `make video`. [Play the video](https://sukhmanaulakh18.github.io/roll-call/video.html) · [interactive replay](https://sukhmanaulakh18.github.io/roll-call/#/replay) · [mp4](docs/media/roll-call-demo.mp4) · [full 3:45 walkthrough of the live app](docs/media/roll-call-tour.mp4)
 
 ## Positioning
 

@@ -16,7 +16,7 @@ writeFileSync(`${out}/replay/agents.json`, JSON.stringify(FLEET));
 writeFileSync(`${out}/.nojekyll`, '');
 if (existsSync('docs/media/roll-call-demo.mp4')) { // recorded with `make video` from a real run
   mkdirSync(`${out}/media`, { recursive: true });
-  for (const f of ['roll-call-demo.mp4', 'roll-call-poster.png']) cpSync(`docs/media/${f}`, `${out}/media/${f}`);
+  for (const f of ['roll-call-demo.mp4', 'roll-call-poster.png', 'roll-call-tour.mp4']) if (existsSync(`docs/media/${f}`)) cpSync(`docs/media/${f}`, `${out}/media/${f}`);
   writeFileSync(`${out}/video.html`, `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Roll Call: demo video</title><style>
 :root{color-scheme:light dark;--bg:#f4f7fb;--ink:#0b1f3a;--muted:#4a5b73;--blue:#1f5fbf}
@@ -28,6 +28,9 @@ a{color:var(--blue)}footer{margin-top:16px;font-size:.875rem;color:var(--muted)}
 <h1>Roll Call: watch a runaway AI agent get stopped, with proof</h1>
 <p>Recorded from a real run: the live gateway, a runaway-loop drill with and without controls, then detect, throttle, page, kill and the independent proof.</p>
 <video controls playsinline preload="metadata" poster="media/roll-call-poster.png"><source src="media/roll-call-demo.mp4" type="video/mp4"></video>
+<h2 style="margin:28px 0 4px">Full walkthrough of the live app (3:45)</h2>
+<p>Every screen and every drill on a real running stack: runaway loop, ping-pong, scope drift, bad and good release, kill with proof, admission, registry, spend, engineering, replay.</p>
+<video controls playsinline preload="metadata"><source src="media/roll-call-tour.mp4" type="video/mp4"></video>
 <p style="margin-top:16px"><a href="./#/replay">Open the interactive replay</a> · <a href="https://github.com/SukhmanAulakh18/roll-call">Source</a></p>
 <footer>Simulated fleet · real controls · not affiliated with any company</footer></main></body></html>`);
 }
