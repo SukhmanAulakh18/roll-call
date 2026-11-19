@@ -127,3 +127,18 @@ test('gateway: a malformed bundle (valid JSON, wrong shape) is rejected and the 
     } finally { await gw.close(); fake.closeAllConnections(); fake.close(); }
   } finally { await s.close(); }
 });
+
+test('gateway: /v1/direct is 404 unless directEnabled; when enabled the call is still recorded with governed:false', async () => {
+  const { startGateway } = await import('./app.ts');
+  const s = await quiet();
+  const off = await startGateway({ controlUrl: s.control.url, toolsUrl: s.tools.url, gatewayId: 'gw-off', dataDir: mkdtempSync(join(tmpdir(), 'rc-')), directEnabled: false });
+  try {
+    assert.equal((await post(`${off.url}/v1/direct`, { agentId: 'invoice-recon', tool: 'ledger.read', args: {} })).status, 404);
+    const t0 = Date.now();
+    const on = await post(`${s.gateways[0].url}/v1/direct`, { agentId: 'invoice-recon', tool: 'ledger.read', args: {} });
+    assert.equal(on.status, 200);
+    await new Promise(r => setTimeout(r, 400));   // event batch flush to control
+    const ev = s.control.engine.eventsBetween(t0, Date.now(), 'invoice-recon').find(e => e.receiptId === on.body.receiptId);
+    assert.ok(ev && ev.governed === false && ev.receiptId.startsWith('direct:'));
+  } finally { await off.close(); await s.close(); }
+});

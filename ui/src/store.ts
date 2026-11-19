@@ -205,7 +205,10 @@ export async function killAgent(id: string): Promise<IncidentEvent> {
     ingest(fixtureFleet({ ...(state.fleet?.states ?? {}), [id]: 'killed' }, state.fleet?.spendPerMinUsd ?? {}, t) as StreamMessage);
     return ev;
   }
-  const ev: IncidentEvent = await postJSON(`/v1/agents/${encodeURIComponent(id)}/kill`);
+  // 502 carries the unproven incident event (kill_unconfirmed) as its body: show it, do not treat it as a transport error.
+  const r = await fetch(`/v1/agents/${encodeURIComponent(id)}/kill`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  const ev: IncidentEvent | null = await r.json().catch(() => null);
+  if (!ev || typeof ev !== 'object' || !('stage' in ev)) throw new Error(`HTTP ${r.status}`);
   ingest({ type: 'incident', data: ev });
   return ev;
 }

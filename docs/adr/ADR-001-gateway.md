@@ -27,3 +27,9 @@ Build option 2 now. The interface covers `forward(call)`, `setPolicy(agentId, {r
 - Hot reload: the file is watched. Editing the deny rule in cfg.yaml and waiting 4s flipped results with no restart (previously denied id allowed with 200, new id denied with 403). Log: "loaded config from File".
 - Not verified: `localRateLimit` is per route, not per agent. Per-agent keyed limits need `remoteRateLimit` (an external rate-limit service) or one route per agent, which I did not test. The binary also contains budget and JWT, extAuthz and XDS strings, and I did not exercise them. Per-agent attribution via header works. JWT identity was not tested.
 - Verdict: agentgateway is viable. Per-agent kill by config hot-reload is proven. A per-agent budget is unproven.
+
+## Addendum: the ungoverned baseline (`/v1/direct`)
+The reference gateway can serve `POST /v1/direct`, which skips identity, scope, budget, throttle and masking. It exists only to measure the ungoverned baseline (`make bench`, A/B drills).
+- Off by default: it answers 404 unless the gateway is started with `directEnabled: true` or the environment variable `RC_DIRECT_BASELINE=1`. The in-process simulation stack (`sim/stack.ts`, used by bench, drills and the demo) turns it on; compose sets it for the demo gateways only.
+- Every direct call is still recorded: an action event with `governed: false` and a `direct:<gateway>:<n>` receipt id goes to the control plane and shows in the UI. It is not appended to the gateway's hash chain (the chain covers governed decisions only).
+- It is not a security boundary. Nothing in this repo forces agents through the gateway at the network layer (no NetworkPolicy or egress control yet); in production the baseline flag must stay off.

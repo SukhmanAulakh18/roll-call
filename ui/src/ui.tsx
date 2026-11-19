@@ -88,7 +88,7 @@ export const Initials = ({ name, size = 28 }: { name: string; size?: number }) =
 );
 
 // ---------- incidents ----------
-export const STAGES: IncidentStage[] = ['detected', 'throttled', 'paged', 'owner_ack', 'killed', 'proof', 'resolved'];
+export const STAGES: IncidentStage[] = ['detected', 'throttled', 'paged', 'owner_ack', 'killed', 'proof', 'kill_unconfirmed', 'resolved'];
 export interface IncidentGroup { id: string; agentId: string; byStage: Partial<Record<IncidentStage, IncidentEvent>>; last: IncidentEvent; first: number }
 export function groupIncidents(list: IncidentEvent[]): IncidentGroup[] {
   const m = new Map<string, IncidentGroup>();

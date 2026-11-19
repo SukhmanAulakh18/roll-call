@@ -12,6 +12,7 @@ import { createReceiptWriter } from './receipts.ts';
 export interface GatewayOpts {
   port?: number; host?: string; controlUrl: string; toolsUrl: string; gatewayId: string; dataDir: string;
   pollMs?: number; policy?: PolicyEngine; maxQueue?: number;
+  directEnabled?: boolean;   // serve the ungoverned /v1/direct baseline. Default: env RC_DIRECT_BASELINE=1, else off (404). ADR-001.
 }
 /** ADR-001 interface. setPolicy/kill arrive via the polled bundle (revocation, throttles), not by direct calls. */
 export interface Gateway {
@@ -143,7 +144,7 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
     return { status, body: { verdict, reason, code, receiptId: rec.id, costUsd: cost, latencyMs, ...(result !== undefined ? { result } : {}) } };
   }
 
-  /** Ungoverned baseline: no identity, scope, throttle, budget or masking. Still measured, flagged governed:false, no receipt. */
+  /** Ungoverned baseline (only when directEnabled): no identity, scope, throttle, budget or masking. Still recorded as an event with a `direct:` receipt id and governed:false; not appended to the hash chain. */
   async function direct(req: ActRequest): Promise<{ status: number; body: ActResponse }> {
     const t0 = hr(); const ah = argsHash(req.args);
     const a = hr(); const out = await callTool(req.tool, req, req.args); const toolMs = hr() - a;
@@ -158,7 +159,8 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
   const bearer = (h: string | undefined) => (h ?? '').replace(/^Bearer\s+/i, '');
   const valid = (b: any): b is ActRequest => b && typeof b.agentId === 'string' && typeof b.tool === 'string';
   r.add('POST', '/v1/act', async c => { const b = await c.json(); if (!valid(b)) return fail(400, 'agentId and tool required'); const o = await forward(bearer(c.req.headers.authorization), { ...b, args: b.args ?? {} }); return { status: o.status, body: o.body }; });
-  r.add('POST', '/v1/direct', async c => { const b = await c.json(); if (!valid(b)) return fail(400, 'agentId and tool required'); const o = await direct({ ...b, args: b.args ?? {} }); return { status: o.status, body: o.body }; });
+  const directEnabled = opts.directEnabled ?? process.env.RC_DIRECT_BASELINE === '1';
+  r.add('POST', '/v1/direct', async c => { if (!directEnabled) return fail(404, 'not found'); const b = await c.json(); if (!valid(b)) return fail(400, 'agentId and tool required'); const o = await direct({ ...b, args: b.args ?? {} }); return { status: o.status, body: o.body }; });
   r.add('GET', '/healthz', () => ok({ ok: true, gatewayId: id, bundleVersion: bundle?.version ?? null, bundleAgeMs: Date.now() - lastFresh }));
   const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/metrics') {

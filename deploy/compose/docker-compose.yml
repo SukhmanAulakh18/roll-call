@@ -61,6 +61,7 @@ services:
       <<: *app-env
       PORT: "7200"
       GATEWAY_ID: gw-1
+      RC_DIRECT_BASELINE: "1"   # demo only: enables the ungoverned A/B baseline (/v1/direct). Never set in production.
       CONTROL_URL: http://control:7100
       TOOLS_URL: http://tools:7300
     healthcheck:
@@ -84,6 +85,7 @@ services:
       <<: *app-env
       PORT: "7200"
       GATEWAY_ID: gw-2
+      RC_DIRECT_BASELINE: "1"   # demo only: enables the ungoverned A/B baseline (/v1/direct). Never set in production.
       CONTROL_URL: http://control:7100
       TOOLS_URL: http://tools:7300
     healthcheck:

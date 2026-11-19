@@ -16,10 +16,12 @@ export function useIncidentToasts() {
       seen.current.add(k);
       const a = agents.find((x) => x.id === e.agentId);
       const who = a ? ownerShort(a.owner.name) : 'the owner';
-      if (e.stage === 'detected') toast.warning(`${a?.name ?? e.agentId} is off its baseline`, { description: e.message });
+      // Toast only hard containment. Soft alerts show quietly on the agent's node (state 'alert').
+      if (e.stage === 'throttled' && e.message.startsWith('Hard throttle')) toast.warning(`${a?.name ?? e.agentId} hard-throttled`, { description: e.message });
       else if (e.stage === 'paged') toast(`Paged owner ${who} (simulated)`, { description: a?.owner.escalation });
-      else if (e.stage === 'owner_ack') toast(`${who} acknowledged (simulated)`);
+      else if (e.stage === 'killed') toast.warning(`${a?.name ?? e.agentId} killed, probing`, { description: e.message });
       else if (e.stage === 'proof') toast.success('Proof recorded', { description: e.proof ? `${e.proof.attemptedTool} denied (${e.proof.code}), receipt ${e.proof.receiptId}` : undefined });
+      else if (e.stage === 'kill_unconfirmed') toast.error(`KILL NOT PROVEN: ${a?.name ?? e.agentId}`, { description: e.message, duration: Infinity });
     }
   }, [incidents, agents]);
 }

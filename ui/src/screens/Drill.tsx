@@ -4,7 +4,7 @@ import { Check, CircleDashed, Flame, Play, RotateCcw, Rewind, Repeat2, ShieldQue
 import type { ActionEvent, DrillResult, IncidentStage } from '../../../contracts/types';
 import { FIXTURE, resetDrills, runDrill, useStore, type DrillRun } from '../store';
 import { FixtureChip, Measured, StateMark, groupIncidents, ownerShort, secs, useNow, usd, type AgentState } from '../ui';
-import { Panel, ProofCard } from '../components';
+import { KillUnconfirmed, Panel, ProofCard } from '../components';
 import { FleetMap } from './FleetMap';
 
 const DRILLS = [
@@ -82,7 +82,7 @@ export function Drill() {
   const g = useMemo(() => { const gs = groupIncidents(incidents.filter((e) => e.agentId === d.agent || d.involved.includes(e.agentId as never))); return t0g != null ? gs.find((x) => x.first >= t0g - 2000) ?? null : null; }, [incidents, d, t0g]);
   const agent = agents.find((a) => a.id === d.agent);
   const agState = (state?.[d.agent] ?? 'unknown') as AgentState;
-  const elapsed = t0g != null && active?.phase === 'governed' && !g?.byStage.proof ? Math.max(0, (now - t0g) / 1000) : undefined;
+  const elapsed = t0g != null && active?.phase === 'governed' && !g?.byStage.proof && !g?.byStage.kill_unconfirmed ? Math.max(0, (now - t0g) / 1000) : undefined;
   const marks = useMemo(() => [g?.byStage.throttled, g?.byStage.killed].flatMap((e, i) => (e && t0g ? [{ t: (e.ts - t0g) / 1000, text: i ? 'killed' : 'throttled' }] : [])), [g, t0g]);
   const proof = g?.byStage.proof?.proof;
 
@@ -133,7 +133,7 @@ export function Drill() {
           <Stepper g={g} res={govRes} t0={t0g} running={active?.phase === 'governed'} />
         </Panel>
         <div className="theatre-proof" data-tour="proof">
-          {proof ? <ProofCard agentId={g!.agentId} proof={proof} /> : (
+          {g?.byStage.kill_unconfirmed ? <KillUnconfirmed ev={g.byStage.kill_unconfirmed} /> : proof ? <ProofCard agentId={g!.agentId} proof={proof} /> : (
             <section className="proof proof--wait"><CircleDashed size={28} aria-hidden /><div><h3>Proof appears here</h3><p>When the agent is stopped, a probe replays a call as that agent. A denial with a receipt is the proof.</p></div></section>
           )}
           {d.ab && <Panel title={`${agent?.name ?? d.agent} on the map`} aside={<StateMark state={agState} />} id="tm2-h" className="theatre-map">

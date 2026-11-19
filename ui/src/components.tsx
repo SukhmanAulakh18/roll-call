@@ -12,6 +12,11 @@ import { FixtureChip, Initials, NotMeasured, StateMark, VerdictChip, clock, owne
 /** Mirrors contracts/prices.ts HIGH_RISK_TOOLS (the tools a stale bundle fails closed on). */
 export const HIGH_RISK_TOOLS = ['payments.transfer', 'ledger.post', 'mail.send'];
 
+// ---------- unproven kill: loud, never styled as success ----------
+export const KillUnconfirmed = ({ ev }: { ev: IncidentEvent }) => (
+  <section className="proof is-bad" role="alert"><div><h3>Kill not proven</h3><p className="proof-line">{ev.message}</p></div></section>
+);
+
 // ---------- animated proof card ----------
 export function ProofCard({ agentId, proof, title = 'Stopped, and proven.' }: { agentId: string; proof: NonNullable<IncidentEvent['proof']>; title?: string }) {
   const reduce = useReducedMotion();
@@ -94,7 +99,8 @@ export function KillDialog() {
     try {
       const ev = await killAgent(id);
       setProof(ev);
-      toast.success(`${agent?.name ?? id} stopped`, { description: ev.proof ? `Probe denied (${ev.proof.code}).` : 'Kill sent.' });
+      if (ev.stage === 'kill_unconfirmed') toast.error(`KILL NOT PROVEN: ${agent?.name ?? id}`, { description: ev.message, duration: Infinity });
+      else toast.success(`${agent?.name ?? id} stopped`, { description: ev.proof ? `Probe denied (${ev.proof.code}).` : 'Kill sent.' });
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
   };
@@ -138,7 +144,7 @@ export function KillDialog() {
               </div>
             </>
           )}
-          {agent && proof && (proof.proof ? <ProofCard agentId={agent.id} proof={proof.proof} /> : <p className="note">Kill sent. The server returned no proof yet: {proof.message}</p>)}
+          {agent && proof && (proof.stage === 'kill_unconfirmed' ? <KillUnconfirmed ev={proof} /> : proof.proof ? <ProofCard agentId={agent.id} proof={proof.proof} /> : <p className="note">Kill sent. The server returned no proof yet: {proof.message}</p>)}
           {proof && <div className="modal-foot"><Dialog.Close className="btn btn--primary">Done</Dialog.Close></div>}
         </Dialog.Content>
       </Dialog.Portal>

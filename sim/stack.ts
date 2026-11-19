@@ -12,6 +12,7 @@ export interface StackOpts {
   ports?: { control?: number; gateway?: number; tools?: number }; host?: string;
   impactFile?: string; replayFile?: string; pollMs?: number;
   control?: Partial<ControlOpts>;    // e.g. ttlMs, staleAfterMs (game days)
+  directEnabled?: boolean;           // ungoverned /v1/direct baseline for A/B drills and bench (default true here: this is the simulation harness)
   failover?: boolean;                // fleet gateway failover (default true)
 }
 export interface Stack {
@@ -26,7 +27,7 @@ export async function startStack(o: StackOpts): Promise<Stack> {
   const control = await startControl(copts);
   const gateways: Gateway[] = [];
   for (let i = 1; i <= (o.gateways ?? 1); i++)
-    gateways.push(await startGateway({ controlUrl: control.url, toolsUrl: tools.url, gatewayId: `gw-${i}`, dataDir: o.dataDir, port: o.ports?.gateway ? o.ports.gateway + i - 1 : undefined, host: o.host, pollMs: o.pollMs }));
+    gateways.push(await startGateway({ controlUrl: control.url, toolsUrl: tools.url, gatewayId: `gw-${i}`, dataDir: o.dataDir, port: o.ports?.gateway ? o.ports.gateway + i - 1 : undefined, host: o.host, pollMs: o.pollMs, directEnabled: o.directEnabled ?? true }));
   control.setGateways(gateways.map(g => g.url));
   const fleet = await startFleet({ controlUrl: control.url, gatewayUrls: gateways.map(g => g.url), agents: o.fleet === false ? [] : undefined, failover: o.failover });
   control.setRuntime(fleet);
