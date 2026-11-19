@@ -103,7 +103,7 @@ const PARTNER: Record<string, string> = { 'limits-checker': 'credit-memo', 'cred
 const FAULT_RATE: Record<FaultKind, number | null> = { 'runaway-loop': 40, 'ping-pong': 20, 'scope-drift': 4, 'healthy-burst': 30, 'slow-repeat': null };
 
 // ---------------------------------------------------------------- runtime
-export interface FleetOpts { controlUrl: string; gatewayUrls: string[]; agents?: AgentRecord[]; seed?: number }
+export interface FleetOpts { controlUrl: string; gatewayUrls: string[]; agents?: AgentRecord[]; seed?: number; failover?: boolean }
 export interface FleetHandle extends FleetControl {
   close(): Promise<void>;
   stats(): Record<string, { calls: number; allow: number; deny: number; throttle: number; errors: number }>;
@@ -154,12 +154,21 @@ export async function startFleet(opts: FleetOpts): Promise<FleetHandle> {
   async function step(a: A, mode: DrillMode): Promise<void> {
     const c = nextCall(a);
     const body = JSON.stringify({ agentId: a.rec.id, tool: c.tool, args: c.args, taskId: `${a.rec.id}-t${Math.floor(a.n / 12)}`, model: c.tool === 'llm.complete' ? a.rec.models[0] : undefined, targetAgentId: c.target });
-    const gw = opts.gatewayUrls[gwRound++ % opts.gatewayUrls.length];
+    const first = gwRound++;
     a.st.calls++;
     try {
-      let r: Response;
-      if (mode === 'ungoverned') r = await fetch(`${gw}/v1/direct`, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(3000) });
-      else { await ensureToken(a); r = await fetch(`${gw}/v1/act`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${a.token}` }, body, signal: AbortSignal.timeout(3000) }); }
+      if (mode !== 'ungoverned') await ensureToken(a);
+      let r!: Response;
+      // Failover only on ECONNREFUSED: the request was never accepted, so a retry cannot repeat an action.
+      for (let k = 0; k < opts.gatewayUrls.length; k++) {
+        const gw = opts.gatewayUrls[(first + k) % opts.gatewayUrls.length];
+        try {
+          r = mode === 'ungoverned'
+            ? await fetch(`${gw}/v1/direct`, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(3000) })
+            : await fetch(`${gw}/v1/act`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${a.token}` }, body, signal: AbortSignal.timeout(3000) });
+          break;
+        } catch (e) { if (opts.failover === false || (e as { cause?: { code?: string } }).cause?.code !== 'ECONNREFUSED' || k === opts.gatewayUrls.length - 1) throw e; }
+      }
       const j = await r.json() as { verdict?: string };
       if (j.verdict === 'allow') a.st.allow++; else if (j.verdict === 'throttle') a.st.throttle++; else a.st.deny++;
     } catch { a.st.errors++; }

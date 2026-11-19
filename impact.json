@@ -33,10 +33,10 @@
     "throughputRps": 2279.3549704426696,
     "targetDecisionP99Ms": 50
   },
-  "generatedAt": "2026-11-19T06:34:42.962Z",
-  "gitSha": "37bd34f",
+  "generatedAt": "2026-11-19T07:11:48.246Z",
+  "gitSha": "fc20233",
   "environment": {
-    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
     "cores": 4,
     "node": "v22.23.5",
     "os": "linux 6.18.44-fc-v653"
@@ -234,5 +234,300 @@
     },
     "llmCompletions": "Recorded responses from sim/recorded-llm.json; token counts are pre-written approximations.",
     "simulatedPager": "Pager and owner acknowledgement (auto-ack after ~1 s) are simulated; no real page is sent."
+  },
+  "chaos": {
+    "command": "node scripts/chaos.ts",
+    "runAt": "2026-11-19T07:11:48.246Z",
+    "durationS": 74,
+    "topology": "in-process: 1 control, 1-2 gateway replicas, mock tools, mini-agents or the 12-agent simulated fleet, all on one laptop-class machine (see environment)",
+    "settings": {
+      "bundleStaleAfterMs": 2000,
+      "bundlePollMs": 200,
+      "identityTtlMsDefault": 60000,
+      "identityTtlMsIssuerGameDay": 3000,
+      "eventQueueMaxGameDay": 200
+    },
+    "scenarios": {
+      "control-plane-stop": {
+        "id": "control-plane-stop",
+        "title": "Control plane stops, then restarts",
+        "hypothesis": "While control is down, running agents keep succeeding on low-risk tools using the cached bundle; high-risk tools fail closed with STALE_POLICY_HIGH_RISK once the bundle is older than staleAfterMs; no new identity or admission is possible. After restart, a fresh bundle arrives and normal operation resumes without restarting gateways or agents.",
+        "steadyState": "Success ratio of 3 mini-agents (2 low-risk, 1 high-risk tool) is at least 0.99 for 3 s with control up.",
+        "blastRadius": "One in-process stack: 1 control, 1 gateway, 3 agents at 10 calls/s each. No other process is touched.",
+        "abortCondition": "Steady-state success ratio below 0.99 before injection: no fault is injected. Outage is capped at 6 s.",
+        "recovery": "Control restarts on the same port and data directory; gateways pick up the next bundle on their normal 200 ms poll.",
+        "measured": {
+          "staleAfterMs": 2000,
+          "outageMs": 6000,
+          "steadySuccess": {
+            "calls": 87,
+            "ok": 87,
+            "ratio": 1
+          },
+          "lowRiskDuringOutage": {
+            "calls": 120,
+            "ok": 120,
+            "ratio": 1,
+            "codes": {
+              "OK": 120
+            }
+          },
+          "highRiskDuringOutage": {
+            "calls": 60,
+            "codes": {
+              "OK": 18,
+              "STALE_POLICY_HIGH_RISK": 42
+            }
+          },
+          "highRiskAfterStaleDeniedRatio": 1,
+          "allCallsSuccessRatioDuringOutage": 0.7667,
+          "mttdMs": 1824,
+          "mttrMs": 28,
+          "controlListenMs": 1,
+          "newIdentityDuringOutage": "refused (ECONNREFUSED)",
+          "newAdmissionDuringOutage": "refused (ECONNREFUSED)",
+          "newIdentityAfterRestart": "HTTP 200",
+          "postRecoverySuccess": {
+            "calls": 45,
+            "ok": 45,
+            "ratio": 1
+          },
+          "agentsRestarted": false,
+          "gatewaysRestarted": false,
+          "receiptChain": {
+            "ok": true,
+            "count": 360
+          }
+        },
+        "hypothesisHeld": true
+      },
+      "identity-issuer-down": {
+        "id": "identity-issuer-down",
+        "title": "Identity issuer (control token endpoint) fails, then recovers",
+        "hypothesis": "Tokens issued before the fault keep working until their own expiry (TTL 3000 ms, test setting); renewals fail; after expiry every call is denied UNAUTHENTICATED, and no call is allowed on an expired token. When the issuer returns, agents renew and are allowed again without a restart.",
+        "steadyState": "All three agents hold a valid token (renewing at half TTL) and succeed at least 0.99 for 4 s.",
+        "blastRadius": "One in-process stack with 1 gateway reaching control through a fault proxy that fails only POST /v1/identity/token with 503. Bundle polling and event push are untouched.",
+        "abortCondition": "Steady-state success ratio below 0.99 before injection: no fault is injected. Fault is capped at 8 s.",
+        "recovery": "Proxy stops failing the token endpoint. Agents renew on their next call.",
+        "measured": {
+          "ttlMs": 3000,
+          "faultMs": 8001,
+          "renewalsFailedDuringFault": 220,
+          "perAgent": [
+            {
+              "agent": "kyc-refresh",
+              "tokenRemainingAtFaultMs": 2111,
+              "timeToFirstDenialMs": 2208,
+              "lastAllowAfterFaultMs": 2108,
+              "allowedAfterTokenExpiry": 0,
+              "callsAfterExpiry": 58,
+              "deniedCodesAfterFault": {
+                "UNAUTHENTICATED": 58
+              },
+              "recoveryMs": 5
+            },
+            {
+              "agent": "invoice-recon",
+              "tokenRemainingAtFaultMs": 2106,
+              "timeToFirstDenialMs": 2108,
+              "lastAllowAfterFaultMs": 2008,
+              "allowedAfterTokenExpiry": 0,
+              "callsAfterExpiry": 58,
+              "deniedCodesAfterFault": {
+                "UNAUTHENTICATED": 58
+              },
+              "recoveryMs": 9
+            },
+            {
+              "agent": "payment-orchestrator",
+              "tokenRemainingAtFaultMs": 2204,
+              "timeToFirstDenialMs": 2208,
+              "lastAllowAfterFaultMs": 2108,
+              "allowedAfterTokenExpiry": 0,
+              "callsAfterExpiry": 57,
+              "deniedCodesAfterFault": {
+                "UNAUTHENTICATED": 57
+              },
+              "recoveryMs": 5
+            }
+          ],
+          "maxTimeToFirstDenialMs": 2208,
+          "allowedAfterExpiryTotal": 0,
+          "maxRecoveryMs": 9
+        },
+        "hypothesisHeld": true
+      },
+      "gateway-replica-loss": {
+        "id": "gateway-replica-loss",
+        "title": "One of two gateway replicas is killed mid-traffic",
+        "hypothesis": "With two replicas and agent-side failover, killing one replica causes at most a handful of transport errors (calls in flight), and the fleet keeps succeeding on the other replica. Without failover (the behaviour before this game day), about half of all calls fail until the replica returns.",
+        "steadyState": "The 12-agent fleet (about 17 calls/s) runs over 2 gateways with transport error rate at most 0.01 for 3 s.",
+        "blastRadius": "One in-process stack: 1 control, 2 gateways, 12 simulated agents. gw-2 is closed (graceful close, so its receipt chain is flushed).",
+        "abortCondition": "Steady-state transport error rate above 0.01 before injection: no fault is injected. Fault is observed for 5 s.",
+        "recovery": "No replica restart in this run. Recovery means the fleet failing over to gw-1; failover only on ECONNREFUSED, so a request in flight when a replica dies is not retried (no repeated actions).",
+        "measured": {
+          "withoutFailover": {
+            "failover": false,
+            "steadyErrorRate": 0,
+            "errorRateAfterLoss": 0.5,
+            "callsAfterLoss": 86,
+            "errorsAfterLoss": 43,
+            "allowRatioAfterLoss": 0.5,
+            "lastErrorMsAfterLoss": 4965,
+            "recovered": "no: errors continue for as long as the replica is down",
+            "receiptChains": {
+              "gw-1": {
+                "ok": true,
+                "count": 65
+              },
+              "gw-2 (killed)": {
+                "ok": true,
+                "count": 21
+              }
+            }
+          },
+          "withFailover": {
+            "failover": true,
+            "steadyErrorRate": 0,
+            "errorRateAfterLoss": 0,
+            "callsAfterLoss": 86,
+            "errorsAfterLoss": 0,
+            "allowRatioAfterLoss": 1,
+            "lastErrorMsAfterLoss": 0,
+            "recovered": "no errors",
+            "receiptChains": {
+              "gw-1": {
+                "ok": true,
+                "count": 108
+              },
+              "gw-2 (killed)": {
+                "ok": true,
+                "count": 21
+              }
+            }
+          },
+          "finding": "The fleet had no gateway failover: its round-robin picked a dead replica for about half of all calls. Fixed in sim/fleet.ts (retry the next replica on ECONNREFUSED only). The without-failover run is the pre-fix behaviour, kept as a measured control."
+        },
+        "hypothesisHeld": true
+      },
+      "bad-policy-bundle": {
+        "id": "bad-policy-bundle",
+        "title": "Control serves a malformed or rejected bundle",
+        "hypothesis": "A bundle that is not valid JSON, is an HTTP error, is empty, or has the wrong shape never replaces the last good bundle: the gateway keeps the same bundle version, low-risk calls keep succeeding, and high-risk tools fail closed only by the normal staleness rule (a bad bundle does not count as fresh).",
+        "steadyState": "Low-risk and high-risk calls succeed at least 0.99 for 2 s with a good bundle.",
+        "blastRadius": "One in-process stack, 1 gateway reaching control through a fault proxy that replaces only GET /v1/bundle.",
+        "abortCondition": "Steady-state success ratio below 0.99 before injection: no fault is injected. Each variant runs 4 s.",
+        "recovery": "Proxy serves the real bundle again; the gateway accepts it on the next poll.",
+        "measured": {
+          "staleAfterMs": 2000,
+          "variants": [
+            {
+              "variant": "garbage",
+              "lowRiskSuccess": {
+                "calls": 79,
+                "ok": 79,
+                "ratio": 1
+              },
+              "highRiskCodes": {
+                "OK": 20,
+                "STALE_POLICY_HIGH_RISK": 20
+              },
+              "highRiskFirstStaleDenialMs": 2095,
+              "bundleVersionBefore": 2,
+              "bundleVersionDuring": 2,
+              "bundlesRejectedByGateway": null,
+              "recoveryToHighRiskOkMs": 293
+            },
+            {
+              "variant": "http500",
+              "lowRiskSuccess": {
+                "calls": 78,
+                "ok": 78,
+                "ratio": 1
+              },
+              "highRiskCodes": {
+                "OK": 19,
+                "STALE_POLICY_HIGH_RISK": 20
+              },
+              "highRiskFirstStaleDenialMs": 2001,
+              "bundleVersionBefore": 2,
+              "bundleVersionDuring": 2,
+              "bundlesRejectedByGateway": null,
+              "recoveryToHighRiskOkMs": 203
+            },
+            {
+              "variant": "empty",
+              "lowRiskSuccess": {
+                "calls": 78,
+                "ok": 2,
+                "ratio": 0.0256
+              },
+              "highRiskCodes": {
+                "OK": 2,
+                "undefined": 38
+              },
+              "highRiskFirstStaleDenialMs": null,
+              "bundleVersionBefore": 2,
+              "bundleVersionDuring": null,
+              "bundlesRejectedByGateway": null,
+              "recoveryToHighRiskOkMs": 203
+            },
+            {
+              "variant": "badshape",
+              "lowRiskSuccess": {
+                "calls": 80,
+                "ok": 4,
+                "ratio": 0.05
+              },
+              "highRiskCodes": {
+                "OK": 2,
+                "undefined": 38
+              },
+              "highRiskFirstStaleDenialMs": null,
+              "bundleVersionBefore": 2,
+              "bundleVersionDuring": 99999,
+              "bundlesRejectedByGateway": null,
+              "recoveryToHighRiskOkMs": 209
+            }
+          ],
+          "note": "http500 is an unavailable control, not a malformed bundle, so the gateway does not count it as rejected."
+        },
+        "hypothesisHeld": false
+      },
+      "telemetry-backlog": {
+        "id": "telemetry-backlog",
+        "title": "Control events endpoint hangs, then returns",
+        "hypothesis": "With POST /v1/events hanging, the gateway's event buffer stays bounded at 200 (test setting), oldest events are dropped and counted, decisions are unaffected (success ratio and decision latency), and after recovery every decision is either delivered to control or counted as dropped.",
+        "steadyState": "Success ratio at least 0.99 and events delivered to control, for 3 s at about 120 calls/s.",
+        "blastRadius": "One in-process stack, 1 gateway reaching control through a fault proxy that holds only POST /v1/events (the gateway gives up after 1 s). Receipts are written locally and are not affected.",
+        "abortCondition": "Steady-state success ratio below 0.99 before injection: no fault is injected. Fault is held for 5 s.",
+        "recovery": "Proxy forwards events again; the gateway drains its buffer in batches of 500 every 100 ms.",
+        "measured": {
+          "maxQueue": 200,
+          "faultMs": 5001,
+          "steadySuccess": {
+            "calls": 360,
+            "ok": 360,
+            "ratio": 1
+          },
+          "successDuringFault": {
+            "calls": 597,
+            "ok": 597,
+            "ratio": 1
+          },
+          "decisionP99MsSteady": 0.2052,
+          "decisionP99MsDuringFault": 0.1801,
+          "eventsDroppedDuringFault": 302,
+          "eventsDeliveredDuringFault": 348,
+          "decisionsTotal": 957,
+          "eventsDeliveredFinal": 548,
+          "eventsDroppedFinal": 409,
+          "accountingBalances": true,
+          "drainMsAfterRecovery": 118
+        },
+        "hypothesisHeld": true
+      }
+    },
+    "allHypothesesHeld": false
   }
 }

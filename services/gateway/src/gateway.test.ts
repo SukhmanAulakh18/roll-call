@@ -102,3 +102,28 @@ test('control: manual kill returns proof and receipts verify after close', async
   assert.equal(verifyChain(join(dir, 'receipts', 'gw-1.jsonl')).ok, true);
   assert.ok(readFileSync(join(dir, 'registry.json'), 'utf8').includes('kyc-refresh'));
 });
+
+test('gateway: a malformed bundle (valid JSON, wrong shape) is rejected and the last good bundle is kept', async () => {
+  const { startGateway, validBundle } = await import('./app.ts');
+  const http = await import('node:http');
+  const s = await quiet();
+  try {
+    const good = await (await fetch(`${s.control.url}/v1/bundle`)).json();
+    assert.equal(validBundle(good), true);
+    assert.equal(validBundle({ version: 9 }), false);
+    assert.equal(validBundle({ ...good, agents: null }), false);
+    let body: unknown = good;
+    const fake = http.createServer((_q, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); });
+    await new Promise<void>(r => fake.listen(0, '127.0.0.1', () => r()));
+    const gw = await startGateway({ controlUrl: `http://127.0.0.1:${(fake.address() as any).port}`, toolsUrl: s.tools.url, gatewayId: 'gw-bad', dataDir: mkdtempSync(join(tmpdir(), 'rc-')), pollMs: 50 });
+    try {
+      const tok = await token(s, 'invoice-recon');
+      body = { version: 99, agents: null };            // 200 OK, JSON, but unusable
+      await new Promise(r => setTimeout(r, 300));
+      const r = await post(`${gw.url}/v1/act`, { agentId: 'invoice-recon', tool: 'ledger.read', args: {} }, { authorization: `Bearer ${tok}` });
+      assert.equal(r.body.code, 'OK');
+      assert.equal((await (await fetch(`${gw.url}/healthz`)).json() as any).bundleVersion, (good as any).version);
+      assert.match(await (await fetch(`${gw.url}/metrics`)).text(), /bundles_rejected_total\{gateway="gw-bad"\} [1-9]/);
+    } finally { await gw.close(); fake.closeAllConnections(); fake.close(); }
+  } finally { await s.close(); }
+});

@@ -31,6 +31,12 @@ export function mask<T>(v: T): T {
   return v;
 }
 
+const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+/** Shape check only (no signature yet): reject anything the policy engine could not safely read. */
+export const validBundle = (b: any): b is PolicyBundle =>
+  isObj(b) && typeof b.version === 'number' && isObj(b.agents) && isObj(b.revoked) && isObj(b.throttles) && isObj(b.prices)
+  && Array.isArray(b.highRiskTools) && typeof b.staleAfterMs === 'number' && Number.isFinite(b.staleAfterMs);
+
 const BUCKETS = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1];
 
 export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
@@ -47,7 +53,7 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
     const w = m.get(k); if (!w || now - w.start >= span) m.set(k, { start: now, sum: usd }); else w.sum += usd;
   };
   const decisions = new Map<string, number>();
-  const hist = new Array(BUCKETS.length + 1).fill(0); let histSum = 0, histCount = 0, dropped = 0, spendTotal = 0;
+  const hist = new Array(BUCKETS.length + 1).fill(0); let histSum = 0, histCount = 0, dropped = 0, spendTotal = 0, bundlesRejected = 0;
   const observe = (ms: number) => { const s = ms / 1000; let i = 0; while (i < BUCKETS.length && s > BUCKETS[i]) i++; hist[i]++; histSum += s; histCount++; };
 
   function takeToken(agentId: string, now: number): boolean {
@@ -65,8 +71,10 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
   async function refresh(): Promise<void> {
     try {
       const r = await fetch(`${opts.controlUrl}/v1/bundle?gw=${encodeURIComponent(id)}&v=${bundle?.version ?? 0}`, { signal: AbortSignal.timeout(500) });
-      if (r.ok) { bundle = await r.json() as PolicyBundle; lastFresh = Date.now(); }
-    } catch { /* control unreachable: continue on the cached bundle */ }
+      if (!r.ok) return;
+      const b = await r.json().catch(() => null);
+      if (validBundle(b)) { bundle = b; lastFresh = Date.now(); } else bundlesRejected++; // malformed: keep the last good bundle, do not count it as fresh
+    } catch { /* control unreachable or body unreadable: continue on the cached bundle */ }
   }
   await refresh();
   const poll = setInterval(refresh, opts.pollMs ?? 200);
@@ -157,6 +165,7 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
       const L: string[] = ['# TYPE rollcall_gateway_decisions_total counter'];
       for (const [k, n] of decisions) { const [vd, cd] = k.split('|'); L.push(`rollcall_gateway_decisions_total{gateway="${id}",verdict="${vd}",code="${cd}"} ${n}`); }
       L.push('# TYPE rollcall_gateway_events_dropped_total counter', `rollcall_gateway_events_dropped_total{gateway="${id}"} ${dropped}`);
+      L.push('# TYPE rollcall_gateway_bundles_rejected_total counter', `rollcall_gateway_bundles_rejected_total{gateway="${id}"} ${bundlesRejected}`);
       L.push('# TYPE rollcall_gateway_spend_usd_total counter', `rollcall_gateway_spend_usd_total{gateway="${id}"} ${spendTotal}`);
       L.push('# TYPE rollcall_gateway_bundle_age_ms gauge', `rollcall_gateway_bundle_age_ms{gateway="${id}"} ${Date.now() - lastFresh}`);
       L.push('# TYPE rollcall_gateway_decision_seconds histogram');

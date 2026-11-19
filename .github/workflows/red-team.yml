@@ -32,7 +32,7 @@ jobs:
         run: node scripts/drill.ts --runs 3 --no-write | tee drill.out
       - name: Gate on precision, recall, containment
         run: |
-          head -n -1 drill.out | node -e '
+          sed -n '/^{$/,/^}$/p' drill.out | node -e '
             const r = JSON.parse(require("fs").readFileSync(0, "utf8"));
             const d = r.detector, t = r.drill.timeToContainMs, b = r.drill.budgetsMs;
             const bad = [];
