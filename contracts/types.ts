@@ -143,5 +143,6 @@ export interface DrillResult {
   stages: Partial<Record<IncidentStage, number>>; // ms since t0
   timeToContainMs: number | null; // ms from t0 to 'proof' (governed only)
   detected: boolean;
-  hardContained: boolean;        // hard throttle or kill happened
+  hardContained: boolean;        // hard throttle or kill happened (negatives: on ANY agent, so collateral false positives count)
+  collateralIncidents?: string[]; // other agents that raised an incident during the window
 }

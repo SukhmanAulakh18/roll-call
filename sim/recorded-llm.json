@@ -1,0 +1,209 @@
+{
+ "note": "Recorded (synthetic, pre-written) completions. No model is called at runtime. outputTokens ~= characters/4; inputTokens are assumed prompt sizes. Selected by sha256(prompt) mod N.",
+ "completions": [
+  {
+   "id": "rec-000",
+   "text": "Transaction pattern matches a known card-testing sequence: three small authorisations followed by one large one within four minutes. Recommend a temporary hold and customer contact.",
+   "inputTokens": 220,
+   "outputTokens": 45
+  },
+  {
+   "id": "rec-001",
+   "text": "Customer profile is consistent with prior activity. No adverse media or sanctions hits in the supplied lists. Risk rating unchanged.",
+   "inputTokens": 317,
+   "outputTokens": 33
+  },
+  {
+   "id": "rec-002",
+   "text": "Summary: the customer asked about a duplicate charge on their statement. The charge was reversed on the second day. No further action required.",
+   "inputTokens": 414,
+   "outputTokens": 36
+  },
+  {
+   "id": "rec-003",
+   "text": "Reconciliation note: invoice total differs from the ledger entry by a rounding amount below the tolerance. Marked as matched.",
+   "inputTokens": 511,
+   "outputTokens": 31
+  },
+  {
+   "id": "rec-004",
+   "text": "Draft test scenario: a series of cash deposits just under the reporting threshold across four branches in one week. Expected outcome: alert raised and routed to a human reviewer.",
+   "inputTokens": 608,
+   "outputTokens": 45
+  },
+  {
+   "id": "rec-005",
+   "text": "Draft test scenario: round-amount transfers to a newly added beneficiary followed by rapid onward transfers. Expected outcome: alert raised, case opened for approval.",
+   "inputTokens": 705,
+   "outputTokens": 42
+  },
+  {
+   "id": "rec-006",
+   "text": "The mortgage package is missing the signed income verification page. All other pages are present and legible.",
+   "inputTokens": 802,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-007",
+   "text": "The appraisal date is older than the policy limit. Request a refreshed appraisal before the file proceeds.",
+   "inputTokens": 259,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-008",
+   "text": "Credit memo outline: purpose of facility, borrower overview, repayment sources, collateral, covenants, risk factors, and recommendation placeholder for the human approver.",
+   "inputTokens": 356,
+   "outputTokens": 43
+  },
+  {
+   "id": "rec-009",
+   "text": "Limit check: requested exposure is within the approved single-name limit with moderate headroom. Flag for review if the facility is increased.",
+   "inputTokens": 453,
+   "outputTokens": 36
+  },
+  {
+   "id": "rec-010",
+   "text": "KYC refresh: address proof is older than twelve months. Customer should be asked to supply a recent utility or bank statement.",
+   "inputTokens": 550,
+   "outputTokens": 32
+  },
+  {
+   "id": "rec-011",
+   "text": "KYC refresh: identity documents are valid and unexpired. Beneficial ownership declaration is unchanged since the last review.",
+   "inputTokens": 647,
+   "outputTokens": 31
+  },
+  {
+   "id": "rec-012",
+   "text": "Case summary: customer called twice about a declined payment. The decline was caused by an expired card. A replacement card was already mailed.",
+   "inputTokens": 744,
+   "outputTokens": 36
+  },
+  {
+   "id": "rec-013",
+   "text": "Case summary: the dispute relates to a recurring subscription. The merchant confirmed cancellation. Refund pending.",
+   "inputTokens": 841,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-014",
+   "text": "Regulatory digest: the supervisor published updated expectations on model risk management. Key changes concern inventory, validation frequency and third-party models.",
+   "inputTokens": 298,
+   "outputTokens": 42
+  },
+  {
+   "id": "rec-015",
+   "text": "Regulatory digest: a consultation on operational resilience closes next month. Impact on payments teams is moderate.",
+   "inputTokens": 395,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-016",
+   "text": "Treasury forecast narrative: overnight liquidity is stable. A modest outflow is expected at month end due to scheduled settlements.",
+   "inputTokens": 492,
+   "outputTokens": 33
+  },
+  {
+   "id": "rec-017",
+   "text": "Treasury forecast narrative: intraday peaks are driven by payroll files. No breach of internal buffers is projected.",
+   "inputTokens": 589,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-018",
+   "text": "Collections message draft: friendly reminder that a payment is due in three days, with a link to set up automatic payments.",
+   "inputTokens": 686,
+   "outputTokens": 31
+  },
+  {
+   "id": "rec-019",
+   "text": "Collections message draft: we noticed the payment did not go through; please contact us to discuss options.",
+   "inputTokens": 783,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-020",
+   "text": "Fraud triage: login from a new device and a new country within one hour, followed by a password reset. Recommend step-up authentication.",
+   "inputTokens": 240,
+   "outputTokens": 34
+  },
+  {
+   "id": "rec-021",
+   "text": "Fraud triage: chargeback pattern concentrated on one merchant category. Escalate to the merchant risk team.",
+   "inputTokens": 337,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-022",
+   "text": "Payment routing: the cheaper rail is available and within cut-off. Recommend routing via the domestic rail.",
+   "inputTokens": 434,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-023",
+   "text": "Payment routing: the beneficiary bank is unavailable on the preferred rail. Fall back to the secondary rail with a one day delay.",
+   "inputTokens": 531,
+   "outputTokens": 32
+  },
+  {
+   "id": "rec-024",
+   "text": "Document search summary: three relevant policy sections found. The most recent version is dated within the last quarter.",
+   "inputTokens": 628,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-025",
+   "text": "Document search summary: no policy section matches the query closely. Suggest rephrasing with the product name.",
+   "inputTokens": 725,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-026",
+   "text": "Reconciliation retry: the upstream ledger responded with a timeout. The request will be retried later.",
+   "inputTokens": 822,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-027",
+   "text": "Reconciliation retry: the invoice reference could not be resolved. Manual review is needed.",
+   "inputTokens": 279,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-028",
+   "text": "The customer complaint is classified as a service issue, low severity, with a response due in five business days.",
+   "inputTokens": 376,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-029",
+   "text": "The customer complaint mentions possible unauthorised access and is classified high severity. Route to the fraud team now.",
+   "inputTokens": 473,
+   "outputTokens": 31
+  },
+  {
+   "id": "rec-030",
+   "text": "Agent-to-agent reply: limit confirmation requested. Please confirm the current approved limit for this counterparty.",
+   "inputTokens": 570,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-031",
+   "text": "Agent-to-agent reply: the limit is confirmed as stated. No change since the last review.",
+   "inputTokens": 667,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-032",
+   "text": "Internal memo draft: summary of control testing results for the quarter. Two minor findings, both with remediation dates.",
+   "inputTokens": 764,
+   "outputTokens": 30
+  },
+  {
+   "id": "rec-033",
+   "text": "Internal memo draft: no exceptions noted in the sample reviewed. Recommend continuing the current monitoring cadence.",
+   "inputTokens": 221,
+   "outputTokens": 30
+  }
+ ]
+}
