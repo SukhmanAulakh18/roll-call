@@ -26,7 +26,7 @@ Reproduce: `make drill-release`. The production design (Argo Rollouts calling th
 | Gateway decision path p99 (in-process timer around the decision code only; excludes I/O and TLS) | at most 50 ms | 0.1023 ms | `bench.governed.p99` |
 | End-to-end p99, governed (loopback, no TLS, single process) | not set | 13.51 ms | `bench.governed.endToEnd.p99` |
 | End-to-end p99, ungoverned (same setup) | not set | 14.63 ms | `bench.direct.endToEnd.p99` |
-| Overhead = difference of the two end-to-end p99s above. Not production latency | not set | -1.11 ms | `bench.overheadP99Ms` |
+| Overhead = difference of the two end-to-end p99s above (zero or negative = within run-to-run noise). Not production latency | not set | -1.11 ms | `bench.overheadP99Ms` |
 | Time to detect, p95 | at most 10000 ms | 752 ms | `drill.stagesP95Ms.detected` |
 | Time to contain, p95 (over 20 drills) | at most 30000 ms | 2227 ms | `drill.timeToContainMs.p95` |
 | Time to hard throttle and page, p95 (automatic part) | not set | 752 ms | `drill.stagesP95Ms.paged` |

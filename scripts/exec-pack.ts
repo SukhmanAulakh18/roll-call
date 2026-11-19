@@ -37,7 +37,7 @@ ${stamp} ${SIM}
 | Time to contain a runaway agent, p95 (over ${V('drill.runs')} drills; includes a SIMULATED owner acknowledgement of ${V('drill.simulatedOwnerAckMs')}) | **${V('drill.timeToContainMs.p95')}** | \`drill.timeToContainMs.p95\` |
 | Of which time to hard throttle and page, p95 (automatic, no human) | **${V('drill.stagesP95Ms.paged')}** | \`drill.stagesP95Ms.paged\` |
 | Spend kept out per runaway drill, mean (${V('drill.spendProtectedUsd.protectedTotal')} across all drills) | **${V('drill.spendProtectedUsd.protectedMean')}** | \`drill.spendProtectedUsd.protectedMean\` |
-| Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **${V('bench.overheadP99Ms')}** | \`bench.overheadP99Ms\` |
+| Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency. Zero or negative means within run-to-run noise | **${V('bench.overheadP99Ms')}** | \`bench.overheadP99Ms\` |
 
 **Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In ${V('release.badRuns')} drills with a faulty new version, ${V('release.autoRollbacks')} were rolled back automatically (p95 ${V('release.timeToRollbackMs.p95')} from the first faulty call); ${V('release.falseRollbacks')} good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted error budget (ADR-014).
 
@@ -107,7 +107,7 @@ ${table(['Requirement', 'Target', 'Measured', 'Field'], [
   ['Gateway decision path p99 (in-process timer around the decision code only; excludes I/O and TLS)', `at most ${V('bench.targetDecisionP99Ms')}`, V('bench.governed.p99'), '`bench.governed.p99`'],
   ['End-to-end p99, governed (loopback, no TLS, single process)', 'not set', V('bench.governed.endToEnd.p99'), '`bench.governed.endToEnd.p99`'],
   ['End-to-end p99, ungoverned (same setup)', 'not set', V('bench.direct.endToEnd.p99'), '`bench.direct.endToEnd.p99`'],
-  ['Overhead = difference of the two end-to-end p99s above. Not production latency', 'not set', V('bench.overheadP99Ms'), '`bench.overheadP99Ms`'],
+  ['Overhead = difference of the two end-to-end p99s above (zero or negative = within run-to-run noise). Not production latency', 'not set', V('bench.overheadP99Ms'), '`bench.overheadP99Ms`'],
   ['Time to detect, p95', `at most ${V('drill.budgetsMs.detect')}`, V('drill.stagesP95Ms.detected'), '`drill.stagesP95Ms.detected`'],
   ['Time to contain, p95 (over ' + V('drill.runs') + ' drills)', `at most ${V('drill.budgetsMs.containP95')}`, V('drill.timeToContainMs.p95'), '`drill.timeToContainMs.p95`'],
   ['Time to hard throttle and page, p95 (automatic part)', 'not set', V('drill.stagesP95Ms.paged'), '`drill.stagesP95Ms.paged`'],

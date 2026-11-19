@@ -112,12 +112,12 @@ export function Engineering() {
     <div className="eng">
       <header className="page-h"><div><h1>Engineering</h1><p className="lead">What control costs in latency, how much of each budget is used, and how a call is decided.</p></div>{source === 'fixture' && <FixtureChip />}</header>
 
-      <Panel title="Latency against the ungoverned path (in-process decision timer; overhead is end to end, loopback, no TLS)" id="lat-h" aside={<VerifyButton spec={{ title: 'Gateway latency', what: 'End-to-end latency with controls compared with calling the tool with no controls at all. The overhead is the difference of two end-to-end p99s, over loopback, plain HTTP, no TLS, in one process: not production latency.', field: 'bench.governed, bench.direct, bench.overheadP99Ms, bench.throughputRps', shown: isNum(b?.overheadP99Ms) ? `+${b.overheadP99Ms} ms at p99` : 'not measured yet', kind: 'measured', command: b?.command ?? 'make bench' }} />}>
+      <Panel title="Latency against the ungoverned path (in-process decision timer; overhead is end to end, loopback, no TLS)" id="lat-h" aside={<VerifyButton spec={{ title: 'Gateway latency', what: 'End-to-end latency with controls compared with calling the tool with no controls at all. The overhead is the difference of two end-to-end p99s, over loopback, plain HTTP, no TLS, in one process: not production latency.', field: 'bench.governed, bench.direct, bench.overheadP99Ms, bench.throughputRps', shown: isNum(b?.overheadP99Ms) ? (b.overheadP99Ms > 0 ? `+${b.overheadP99Ms.toFixed(2)} ms at p99` : `within run-to-run noise (${b.overheadP99Ms.toFixed(2)} ms measured)`) : 'not measured yet', kind: 'measured', command: b?.command ?? 'make bench' }} />}>
         {b && opt ? (
           <div className="grid-2 grid-2--wide">
             <EChart option={opt} height={280} label="Decision latency at p50, p95 and p99, with Roll Call and without" />
             <dl className="bigfacts">
-              <div><dt>Overhead: difference of end-to-end p99s (loopback, no TLS)</dt><dd className="reading reading--m">{lbl(b.overheadP99Ms)}<span className="reading-unit"> ms</span></dd></div>
+              <div><dt>Overhead: difference of end-to-end p99s (loopback, no TLS)</dt><dd className="reading reading--m">{b.overheadP99Ms > 0 ? <>{lbl(b.overheadP99Ms)}<span className="reading-unit"> ms</span></> : <>within noise<span className="reading-unit"> ({b.overheadP99Ms.toFixed(2)} ms measured)</span></>}</dd></div>
               <div><dt>Throughput</dt><dd className="reading reading--m">{lbl(b.throughputRps)}<span className="reading-unit"> req/s</span></dd></div>
               <div><dt>Source</dt><dd><Measured /> <span className="measured">{b.command}</span></dd></div>
             </dl>

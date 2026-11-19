@@ -149,7 +149,7 @@ const rows: [string, string, string, string][] = [
   ['contain_p95', secs(containP95Ms), 'drill.timeToContainMs.p95', `${secs(containP95Ms)} to contain, p95, including a ${secs(ackMs)} simulated owner acknowledgement`],
   ['auto_p95', `${autoP95Ms} ms`, 'drill.stagesP95Ms.paged', `${autoP95Ms} ms to throttle and page automatically, p95 (no human in the loop)`],
   ['owner_ack_simulated', secs(ackMs), 'drill.simulatedOwnerAckMs', `a simulated owner acknowledgement of ${secs(ackMs)}`],
-  ['overhead_p99', `${overheadP99Ms.toFixed(2)} ms`, 'bench.overheadP99Ms', `${overheadP99Ms.toFixed(2)} ms extra at p99, end to end, loopback, one laptop, no TLS (not production latency)`],
+  ['overhead_p99', `${overheadP99Ms.toFixed(2)} ms`, 'bench.overheadP99Ms', overheadP99Ms > 0 ? `${overheadP99Ms.toFixed(2)} ms extra at p99, end to end, loopback, one laptop, no TLS (not production latency)` : `no measurable extra latency at p99 (${overheadP99Ms.toFixed(2)} ms, within run-to-run noise), end to end, loopback, one laptop, no TLS (not production latency)`],
   ['decision_p99', `${decisionP99Ms.toFixed(2)} ms`, 'bench.governed.p99', `${decisionP99Ms.toFixed(2)} ms decision-path p99 (in-process timer)`],
   ['detector_precision', detPrecision.toFixed(2), 'detector.precision', `precision ${detPrecision.toFixed(2)} for hard containment`],
   ['detector_recall', detRecall.toFixed(2), 'detector.recall', `recall ${detRecall.toFixed(2)} for hard containment`],

@@ -14,15 +14,15 @@ Spoken forms are in the last column. Use the key in double angle brackets in `do
 | `contain_p95` | 2.2 s | `drill.timeToContainMs.p95` | 2.2 s to contain, p95, including a 1.0 s simulated owner acknowledgement |
 | `auto_p95` | 752 ms | `drill.stagesP95Ms.paged` | 752 ms to throttle and page automatically, p95 (no human in the loop) |
 | `owner_ack_simulated` | 1.0 s | `drill.simulatedOwnerAckMs` | a simulated owner acknowledgement of 1.0 s |
-| `overhead_p99` | 0.87 ms | `bench.overheadP99Ms` | 0.87 ms extra at p99, end to end, loopback, one laptop, no TLS (not production latency) |
-| `decision_p99` | 0.09 ms | `bench.governed.p99` | 0.09 ms decision-path p99 (in-process timer) |
+| `overhead_p99` | -1.11 ms | `bench.overheadP99Ms` | no measurable extra latency at p99 (-1.11 ms, within run-to-run noise), end to end, loopback, one laptop, no TLS (not production latency) |
+| `decision_p99` | 0.10 ms | `bench.governed.p99` | 0.10 ms decision-path p99 (in-process timer) |
 | `detector_precision` | 1.00 | `detector.precision` | precision 1.00 for hard containment |
 | `detector_recall` | 1.00 | `detector.recall` | recall 1.00 for hard containment |
 | `detector_runs_per_case` | 3 | `detector.runsPerCase` | 3 runs per case (small, scripted) |
 | `detector_hard_false_alarms` | 0 | `detector.fp` | 0 hard false alarms |
 | `soft_alerts_on_negatives` | 6 of 9 | `detector.softOnNegatives` | soft alerts in 6 of 9 negative-case runs |
 | `chaos_game_days` | 5 | `chaos.scenarios` | 5 game days (control stop, issuer down, gateway loss, bad bundle, event backlog) |
-| `generated_at` | 2026-11-19 08:45 UTC | `generatedAt` | run 2026-11-19 08:45 UTC |
-| `git_sha` | 8cf416e | `gitSha` | git 8cf416e |
+| `generated_at` | 2026-11-19 15:34 UTC | `generatedAt` | run 2026-11-19 15:34 UTC |
+| `git_sha` | eebcee1 | `gitSha` | git eebcee1 |
 
 Labels that must stay with the numbers: overhead is an end-to-end difference of two p99s, not decision latency; time to contain includes a simulated owner acknowledgement; detector figures are for hard containment only, on small scripted runs; prices are assumptions.
