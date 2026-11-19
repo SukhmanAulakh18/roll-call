@@ -13,14 +13,14 @@ export const FIXTURE_IMPACT = {
   },
   // Same shape as the real impact.json detector section (cases is an object keyed by case name).
   detector: {
-    tp: 9, fp: 0, fn: 0, tn: 9, precision: 1, recall: 1, runsPerCase: 3,
+    tp: 9, fp: 0, fn: 0, tn: 9, precision: 1, recall: 1, runsPerCase: 3, softOnNegatives: { runs: 9, runsWithAlert: 0 },
     cases: {
-      'runaway-loop': { positive: true, runs: 3, detected: 3, hardContained: 3, collateral: 0 },
-      'ping-pong': { positive: true, runs: 3, detected: 3, hardContained: 3, collateral: 0 },
-      'scope-drift': { positive: true, runs: 3, detected: 3, hardContained: 3, collateral: 0 },
-      'healthy-burst': { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0 },
-      'slow-repeat': { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0 },
-      normal: { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0 },
+      'runaway-loop': { positive: true, runs: 3, detected: 3, hardContained: 3, collateral: 0, anyAlert: 0 },
+      'ping-pong': { positive: true, runs: 3, detected: 3, hardContained: 3, collateral: 0, anyAlert: 0 },
+      'scope-drift': { positive: true, runs: 3, detected: 3, hardContained: 3, collateral: 0, anyAlert: 0 },
+      'healthy-burst': { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0, anyAlert: 0 },
+      'slow-repeat': { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0, anyAlert: 0 },
+      normal: { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0, anyAlert: 0 },
     },
   },
   bench: { governed: { p50: 0.4, p95: 0.9, p99: 1.6 }, direct: { p50: 0.2, p95: 0.4, p99: 0.7 }, overheadP99Ms: 0.9, throughputRps: 1200, command: 'make bench' },

@@ -33,8 +33,8 @@
     "throughputRps": 2279.3549704426696,
     "targetDecisionP99Ms": 50
   },
-  "generatedAt": "2026-11-19T07:19:06.564Z",
-  "gitSha": "1a8d073",
+  "generatedAt": "2026-11-19T08:43:52.529Z",
+  "gitSha": "9551603",
   "environment": {
     "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
     "cores": 4,
@@ -81,19 +81,11 @@
     "agentId": "invoice-recon",
     "command": "node scripts/drill.ts --runs 20",
     "spendProtectedUsd": {
-      "ungovernedMean": 0.701499,
+      "ungovernedMean": 0.701646,
       "governedMean": 0.04123,
-      "protectedMean": 0.660269,
-      "protectedTotal": 13.20538,
+      "protectedMean": 0.660416,
+      "protectedTotal": 13.208325,
       "perRunUsd": [
-        0.662625,
-        0.65968,
-        0.65968,
-        0.65968,
-        0.65968,
-        0.65968,
-        0.65968,
-        0.65968,
         0.65968,
         0.65968,
         0.65968,
@@ -103,40 +95,48 @@
         0.65968,
         0.65968,
         0.662625,
+        0.662625,
+        0.65968,
+        0.662625,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
         0.662625,
         0.65968,
         0.662625
       ]
     },
     "callsMean": {
-      "ungoverned": 476.4,
-      "governed": 67
+      "ungoverned": 476.5,
+      "governed": 67.5
     },
     "timeToContainMs": {
-      "p50": 2026,
-      "p95": 2225,
-      "max": 2231,
+      "p50": 2028,
+      "p95": 2227,
+      "max": 2229,
       "samples": [
-        2231,
-        2005,
-        2009,
-        2025,
-        2026,
-        2006,
-        2027,
-        2028,
-        2006,
-        2027,
-        2004,
-        2023,
-        2025,
-        2028,
+        2030,
         2029,
+        2024,
         2028,
-        2225,
-        2202,
-        2025,
-        2225
+        2003,
+        2005,
+        2002,
+        2024,
+        2227,
+        2227,
+        2028,
+        2229,
+        2005,
+        2029,
+        2031,
+        2027,
+        2029,
+        2204,
+        2024,
+        2226
       ],
       "uncontained": 0
     },
@@ -144,10 +144,11 @@
       "detected": 752,
       "throttled": 752,
       "paged": 752,
-      "owner_ack": 1997,
-      "killed": 1999,
-      "proof": 2225
+      "owner_ack": 2001,
+      "killed": 2002,
+      "proof": 2227
     },
+    "simulatedOwnerAckMs": 1000,
     "budgetsMs": {
       "detect": 10000,
       "throttle": 5000,
@@ -163,7 +164,7 @@
     "tn": 9,
     "precision": 1,
     "recall": 1,
-    "definition": "\"Hard containment fired\" (hard throttle or kill). Positives: runaway-loop, ping-pong, scope-drift. Negatives: healthy-burst, slow-repeat, normal (any hard incident on any agent counts as a false positive).",
+    "definition": "HARD containment only: \"hard containment fired\" (hard throttle or kill), n = runsPerCase per case. Positives: runaway-loop, ping-pong, scope-drift. Negatives: healthy-burst, slow-repeat, normal (any hard incident on any agent counts as a false positive).",
     "runsPerCase": 3,
     "cases": {
       "runaway-loop": {
@@ -171,43 +172,53 @@
         "runs": 3,
         "detected": 3,
         "hardContained": 3,
-        "collateral": 0
+        "collateral": 0,
+        "anyAlert": 3
       },
       "ping-pong": {
         "positive": true,
         "runs": 3,
         "detected": 3,
         "hardContained": 3,
-        "collateral": 3
+        "collateral": 3,
+        "anyAlert": 3
       },
       "scope-drift": {
         "positive": true,
         "runs": 3,
         "detected": 3,
         "hardContained": 3,
-        "collateral": 0
+        "collateral": 0,
+        "anyAlert": 3
       },
       "healthy-burst": {
         "positive": false,
         "runs": 3,
         "detected": 3,
         "hardContained": 0,
-        "collateral": 0
+        "collateral": 0,
+        "anyAlert": 3
       },
       "slow-repeat": {
         "positive": false,
         "runs": 3,
         "detected": 3,
         "hardContained": 0,
-        "collateral": 0
+        "collateral": 0,
+        "anyAlert": 3
       },
       "normal": {
         "positive": false,
         "runs": 3,
         "detected": 0,
         "hardContained": 0,
-        "collateral": 0
+        "collateral": 0,
+        "anyAlert": 0
       }
+    },
+    "softOnNegatives": {
+      "runs": 9,
+      "runsWithAlert": 6
     }
   },
   "assumptions": {
