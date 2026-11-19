@@ -106,7 +106,7 @@ export function Hero() {
     </Tile>
   );
   const eng2 = (
-    <Tile q="Does the detector cry wolf?" verify={{ title: 'Detector precision and recall', what: 'Over scripted fault and non-fault cases.', field: 'detector.precision, detector.recall', shown: det ? `${det.precision} / ${det.recall}` : 'not measured yet', kind: 'measured', command: 'make drill' }} note={det ? <><span className="measured">{det.fp}</span> false alarms, <span className="measured">{det.fn}</span> missed, in <span className="measured">{det.cases}</span> cases</> : <NotMeasured cmd="make drill" />}>
+    <Tile q="Does the detector cry wolf?" verify={{ title: 'Detector precision and recall', what: 'Over scripted fault and non-fault cases.', field: 'detector.precision, detector.recall', shown: det ? `${det.precision} / ${det.recall}` : 'not measured yet', kind: 'measured', command: 'make drill' }} note={det ? <><span className="measured">{det.fp}</span> false alarms, <span className="measured">{det.fn}</span> missed, in <span className="measured">{det.tp + det.fp + det.fn + det.tn}</span> runs ({det.runsPerCase} per case), hard containment only</> : <NotMeasured cmd="make drill" />}>
       {det ? <><CountUp value={det.precision} format={(n) => n.toFixed(2)} /><span className="reading-unit"> precision</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );

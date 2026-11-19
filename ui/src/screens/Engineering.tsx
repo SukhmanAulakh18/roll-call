@@ -7,6 +7,7 @@ import { Panel } from '../components';
 import { EChart, baseOption, usePalette } from '../charts';
 
 /** Design targets from docs/latency-budget.md and docs/availability-model.md. They are targets, never results. */
+const detRuns = (d: { tp: number; fp: number; fn: number; tn: number }) => d.tp + d.fp + d.fn + d.tn;
 const TARGETS = { decisionP99Ms: 50, containP95Ms: 30_000, dataPlane: 99.95, controlPlane: 99.9 };
 
 function Burn({ label, used, target, measured, unit, cmd, verify }: { label: string; used?: number; target: string; measured: string; unit?: string; cmd: string; verify: Parameters<typeof VerifyButton>[0]['spec'] }) {
@@ -38,6 +39,22 @@ const NODES: { id: string; plane: 'control' | 'data' | 'edge'; x: number; y: num
   { id: 'ui', plane: 'edge', x: 830, y: 150, w: 100, label: 'This UI', text: 'Reads the SSE stream and the HTTP API. Every number links to its source.' },
 ];
 const LINKS: [string, string, string][] = [['agents', 'gw', 'act'], ['gw', 'tools', 'allowed only'], ['gw', 'receipts', 'append'], ['gw', 'bundle', 'pull'], ['gw', 'engine', 'events'], ['engine', 'kill', 'escalate'], ['kill', 'issuer', 'revoke'], ['kill', 'gw', 'probe'], ['engine', 'ui', 'stream'], ['registry', 'bundle', 'records']];
+
+function DetectorCases({ det }: { det: any }) {
+  const rows = Object.entries(det.cases ?? {}) as [string, { positive: boolean; runs: number; detected: number; hardContained: number; collateral: number }][];
+  const neg = det.softOnNegatives;
+  return (
+    <>
+      <div className="tablewrap"><table>
+        <caption className="visually-hidden">Detector results per scripted case, {det.runsPerCase} runs each</caption>
+        <thead><tr><th scope="col">Case</th><th scope="col">Should contain?</th><th scope="col">Runs</th><th scope="col">Soft or hard alert</th><th scope="col">Hard contained</th><th scope="col">Other agents alerted</th></tr></thead>
+        <tbody>{rows.map(([k, c]) => <tr key={k}><th scope="row">{k}</th><td>{c.positive ? 'yes' : 'no'}</td><td className="measured">{c.runs}</td><td className="measured">{c.detected}</td><td className="measured">{c.hardContained}</td><td className="measured">{c.collateral}</td></tr>)}</tbody>
+        <tfoot><tr><th scope="row">Totals</th><td colSpan={5} className="measured">tp {det.tp}, fp {det.fp}, fn {det.fn}, tn {det.tn}</td></tr></tfoot>
+      </table></div>
+      {neg && <p className="tile-note">Soft alerts on the negative cases: <span className="measured">{neg.runsWithAlert}</span> of <span className="measured">{neg.runs}</span> runs raised a soft alert on some agent. Soft alerts only throttle gently and are not counted as false alarms above.</p>}
+    </>
+  );
+}
 
 function Arch() {
   const [sel, setSel] = useState('gw');
@@ -115,8 +132,8 @@ export function Engineering() {
           <Burn label="Time to contain p95" used={isNum(d?.timeToContainMs?.p95) ? d.timeToContainMs.p95 / containTarget : undefined} target={secs(containTarget)} measured={isNum(d?.timeToContainMs?.p95) ? (d.timeToContainMs.p95 / 1000).toFixed(1) : '—'} unit="s measured" cmd="make drill" verify={{ title: 'Containment p95 against target', what: 'Measured p95 time from fault to proof, over at least 20 drills, divided by the 30 s target.', field: 'drill.timeToContainMs.p95', shown: isNum(d?.timeToContainMs?.p95) ? secs(d.timeToContainMs.p95) : 'not measured yet', kind: 'measured', command: 'make drill' }} />
           <article className="slo"><h3>Detector errors</h3>
             <p className="reading reading--m">{det ? <>{det.fp}<span className="reading-unit"> false alarms, {det.fn} missed</span></> : <span className="reading-na">no data</span>}</p>
-            <p className="tile-note">{det ? <>precision <span className="measured">{det.precision}</span>, recall <span className="measured">{det.recall}</span> over <span className="measured">{det.cases}</span> cases</> : <NotMeasured cmd="make drill" />}</p>
-            <div className="tile-actions"><VerifyButton spec={{ title: 'Detector accuracy', what: 'Precision and recall of the incident detector over scripted fault and non-fault cases. No documented budget, so no burn bar.', field: 'detector.precision, detector.recall, detector.tp/fp/fn/tn', shown: det ? `${det.precision} / ${det.recall}` : 'not measured yet', kind: 'measured', command: 'make drill' }} /></div></article>
+            <p className="tile-note">{det ? <>HARD containment only: precision <span className="measured">{det.precision}</span>, recall <span className="measured">{det.recall}</span>, tp/fp/fn/tn <span className="measured">{det.tp}/{det.fp}/{det.fn}/{det.tn}</span> over <span className="measured">{detRuns(det)}</span> runs ({det.runsPerCase} per case)</> : <NotMeasured cmd="make drill" />}</p>
+            <div className="tile-actions"><VerifyButton spec={{ title: 'Detector accuracy', what: 'Precision and recall for HARD containment (hard throttle or kill) over scripted fault and non-fault cases, with the number of runs per case. Soft alerts on healthy runs are counted separately in the table below. No documented budget, so no burn bar.', field: 'detector.precision, detector.recall, detector.tp/fp/fn/tn', shown: det ? `${det.precision} / ${det.recall}` : 'not measured yet', kind: 'measured', command: 'make drill' }} /></div></article>
           <article className="slo"><h3>Availability</h3>
             <p className="reading reading--m"><span className="reading-na">{impact?.chaos ? 'game days recorded' : 'no data'}</span></p>
             <p className="tile-note">Targets: data plane <span className="measured">{TARGETS.dataPlane}%</span> (21.6 min per 30 days), control plane <span className="measured">{TARGETS.controlPlane}%</span> (43.2 min). {impact?.chaos ? 'See the game-day results below.' : <NotMeasured cmd="make chaos" />}</p>
@@ -125,6 +142,8 @@ export function Engineering() {
         <label className="targetrow">Decision p99 target <Assumption>ASSUMPTION</Assumption> <input className="field field--s measured" inputMode="numeric" value={lat} onChange={(e) => setLat(Number(e.target.value.replace(/[^0-9]/g, '')) || null)} aria-label="Decision path p99 target in milliseconds" /> ms <span className="muted">The design target is {designLat} ms. Change it to see the burn move.</span></label>
         {impact?.chaos && <details className="details"><summary>Game-day results (chaos)</summary><pre className="codeblock measured">{JSON.stringify(impact.chaos, null, 2)}</pre></details>}
       </section>
+
+      {det && <Panel title="Detector cases" id="det-h"><DetectorCases det={det} /></Panel>}
 
       <div className="grid-2 grid-2--wide">
         <Panel title="How a call is decided" id="arch-h"><Arch /></Panel>
