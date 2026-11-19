@@ -72,6 +72,7 @@ Read from the package manifests and installed packages. The backend has no runti
 | `@fontsource-variable/big-shoulders-display` | 5.3.0 | OFL-1.1 | UI bundle |
 | `@fontsource-variable/instrument-sans` | 5.3.0 | OFL-1.1 | UI bundle |
 | `@fontsource-variable/martian-mono` | 5.3.0 | OFL-1.1 | UI bundle |
+| `@fontsource-variable/source-serif-4` | 5.3.1 | OFL-1.1 | UI bundle |
 | `@radix-ui/react-dialog` | 1.3.1 | MIT | UI bundle |
 | `@radix-ui/react-slider` | 1.6.1 | MIT | UI bundle |
 | `@radix-ui/react-tabs` | 1.2.1 | MIT | UI bundle |
