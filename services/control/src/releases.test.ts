@@ -53,3 +53,22 @@ test('promote API: healthy canary traffic is promoted and the record changes; re
     assert.equal((await post(`${c.url}/v1/agents/${id}/promote`, { to: 'production' })).status, 409, 'retired is final');
   } finally { await c.close(); }
 });
+
+test('promote API: a running canary of a production agent is judged as a canary (dryRun for the CD tool)', async () => {
+  const c = await startControl({ dataDir: mkdtempSync(join(tmpdir(), 'rc-')), tickMs: 0 });
+  try {
+    const id = 'invoice-recon';
+    const plain = await post(`${c.url}/v1/agents/${id}/promote?dryRun=1`, { to: 'production' });
+    assert.match(plain.body.reason, /production cannot move to production/);
+    c.setRuntime({ running: async () => [], stop: async () => {}, start: async () => {}, inject: async () => {}, clear: async () => {}, reset: async () => {}, startCanary: async () => {}, stopCanary: async () => {} });
+    c.registry.upsert(c.registry.get(id)!);
+    const rel = await c.releases.start(id, { version: '1.1.0' }).catch(() => null); // no gateway acks in this test: start waits out its ack loop, then runs
+    assert.ok(rel);
+    const at = rel!.startedAt + 1;
+    c.engine.ingest([...Array.from({ length: 10 }, () => ev(rel!.variantId, at)), ...Array.from({ length: 10 }, () => ev(id, at))]);
+    const dry = await post(`${c.url}/v1/agents/${id}/promote?dryRun=1`, { to: 'production' });
+    assert.equal(dry.status, 200, dry.body.reason); assert.equal(c.registry.get(id)!.version, '1.0.0');
+    assert.equal((await post(`${c.url}/v1/agents/${id}/promote`, { to: 'production' })).status, 200);
+    assert.equal(c.registry.get(id)!.version, '1.1.0');
+  } finally { await c.close(); }
+});

@@ -1,6 +1,6 @@
 # Roll Call — every claim has a target. Offline by default.
 NODE ?= node
-.PHONY: help test acceptance typecheck demo stack drill bench chaos exec-pack verify ui replay compose-up compose-down observe observe-otel slo slo-test k6 kind-up admission-demo clean print
+.PHONY: help test acceptance typecheck demo stack drill drill-release bench chaos exec-pack verify ui replay compose-up compose-down observe observe-otel slo slo-test k6 kind-up admission-demo clean print
 
 help: ## list targets
 	@grep -E '^[a-z0-9-]+:.*##' Makefile | sed 's/:.*##/ —/'
@@ -22,6 +22,8 @@ demo: ## offline demo: stack + built UI on http://localhost:7100
 
 drill: ## >=20 A/B runaway drills + detector set -> impact.json
 	$(NODE) scripts/drill.ts --runs 20
+drill-release: ## bad-release (auto-rollback) and good-release (auto-promote) drills -> impact.json release section only
+	$(NODE) scripts/drill.ts --only release
 bench: ## decision-path latency vs ungoverned -> impact.json
 	$(NODE) scripts/bench.ts
 chaos: ## 5 game days: control stop, issuer down, gateway loss, bad bundle, event backlog -> impact.json

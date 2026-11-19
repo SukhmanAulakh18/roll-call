@@ -1,10 +1,23 @@
 # Roll Call: technical brief
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T08:45:37.110Z, gitSha 8cf416e (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:30:27.713Z, gitSha f0f7908 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
 
 ## Architecture (C4 summary)
 
 Full diagrams: [`docs/architecture.md`](../docs/architecture.md). In short: a **control plane** (registry, identity issuer, policy bundle, incident engine, admission, kill and probe) and a **data plane** of gateway replicas that every agent call passes through (authN, revocation, scope, budget and throttle, policy, masking, forward, receipt). The backend has zero runtime dependencies (`node:*` only). Decisions are in `docs/adr/`.
+
+## Release gates and auto-rollback
+
+A version bump runs as a canary taking half of the agent's traffic under its own identity, so gateway events tell the two versions apart. Control judges it with `evaluatePromotion` (`services/control/src/lifecycle.ts`): evaluation evidence present, passed and fresh; drill regression; attack suite with zero escapes; canary error rate and p99 against stable; error budget not exhausted. Failing gates roll the canary back; passing ones promote it after the window. Design and thresholds: ADR-014.
+
+| Measured over 8 bad-release and 8 good-release drills (simulated fleet, one fault kind) | Result | Field |
+|---|---|---|
+| Bad releases rolled back automatically | **8** of 8 | `release.autoRollbacks` |
+| Time to roll back from fault start, p50 / p95 | **8549 ms** / **8578 ms** | `release.timeToRollbackMs` |
+| Good releases promoted automatically | **8** of 8 | `release.goodPromoted` |
+| False rollbacks of good releases | **0** | `release.falseRollbacks` |
+
+Reproduce: `make drill-release`. The production design (Argo Rollouts calling the same gate) is in `deploy/k8s/rollouts/` and is not exercised in this repo's cluster.
 
 ## Non-functional requirements: target vs measured
 
@@ -53,8 +66,9 @@ Read from the package manifests and installed packages. The backend has no runti
 
 | Package | Version | Licence (from its package.json) | Where |
 |---|---|---|---|
-| `typescript` | 5.9.3 | Apache-2.0 | backend dev tooling only (type check) |
 | `@types/node` | 22.19.1 | MIT | backend dev tooling only (type check) |
+| `qrcode` | 1.5.4 | MIT | backend dev tooling only (type check) |
+| `typescript` | 5.9.3 | Apache-2.0 | backend dev tooling only (type check) |
 | `@fontsource-variable/hanken-grotesk` | 5.3.0 | OFL-1.1 | UI bundle |
 | `@fontsource-variable/host-grotesk` | 5.3.0 | OFL-1.1 | UI bundle |
 | `@fontsource/atkinson-hyperlegible-mono` | 5.3.0 | OFL-1.1 | UI bundle |

@@ -1,6 +1,6 @@
 # Roll Call: executive brief
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T08:45:37.110Z, gitSha 8cf416e (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:30:27.713Z, gitSha f0f7908 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
 
 ## The problem: four questions about every AI agent
 
@@ -19,6 +19,8 @@ Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T08:45
 | Of which time to hard throttle and page, p95 (automatic, no human) | **752 ms** | `drill.stagesP95Ms.paged` |
 | Spend kept out per runaway drill, mean ($13.21 across all drills) | **$0.66** | `drill.spendProtectedUsd.protectedMean` |
 | Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **0.87 ms** | `bench.overheadP99Ms` |
+
+**Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In 8 drills with a faulty new version, 8 were rolled back automatically (p95 8578 ms from the first faulty call); 0 good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted error budget (ADR-014).
 
 Also measured: 12 agents registered and 0 running without a record; detector precision 1.00 and recall 1.00 for HARD containment with 0 hard false alarms, at 3 runs per case (small and scripted); soft alerts, which only throttle gently, appeared in 6 of 9 negative-case runs; low-risk success ratio 1.00 while the control plane was stopped. Dollar amounts use price assumptions (`cost-model.md`), not real invoices.
 

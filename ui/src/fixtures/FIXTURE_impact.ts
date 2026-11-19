@@ -23,6 +23,10 @@ export const FIXTURE_IMPACT = {
       normal: { positive: false, runs: 3, detected: 0, hardContained: 0, collateral: 0, anyAlert: 0 },
     },
   },
+  release: {
+    command: 'make drill-release', agentId: 'invoice-recon', badRuns: 8, goodRuns: 8, autoRollbacks: 8, badNotRolledBack: 0, falseRollbacks: 0, goodPromoted: 8,
+    timeToRollbackMs: { p50: 8500, p95: 8700, max: 8800, samples: Array.from({ length: 8 }, () => 8500) },
+  },
   bench: { governed: { p50: 0.4, p95: 0.9, p99: 1.6 }, direct: { p50: 0.2, p95: 0.4, p99: 0.7 }, overheadP99Ms: 0.9, throughputRps: 1200, command: 'make bench' },
   assumptions: {
     pricesUsdPerCall: { 'llm.complete': 0.04, 'ledger.read': 0.0005, 'kyc.lookup': 0.002, 'docs.search': 0.001, 'payments.transfer': 0.01, 'agent.call': 0.0 },

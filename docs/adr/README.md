@@ -16,5 +16,7 @@ Each ADR records one decision: the context, the options considered, what was dec
 | [010](ADR-010-compose-then-kind.md) | Compose first, then kind | Accepted (design) |
 | [011](ADR-011-simulated-fleet-real-controls.md) | Simulated fleet with real controls, and Replay | Accepted (design) |
 | [012](ADR-012-open-licenses-valkey-opentofu.md) | Valkey over Redis, OpenTofu over Terraform | Accepted (design; verify licences) |
+| [013](ADR-013-admission.md) | Two-layer Kubernetes admission | Accepted |
+| [014](ADR-014-promotion-gates.md) | Promotion gates and automatic rollback | Accepted (demo; Argo Rollouts is design only) |
 
 To add an ADR, copy the structure of an existing one, take the next number and add a row here.

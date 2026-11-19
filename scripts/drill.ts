@@ -1,4 +1,4 @@
-// make drill: N governed+ungoverned runaway-loop pairs, plus the detector evaluation set. Writes impact.json (merge) and replay/events.json.
+// make drill: N governed+ungoverned runaway-loop pairs, the detector evaluation set, and the bad/good release drills (--only release runs just those). Writes impact.json (merge) and replay/events.json.
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,11 +7,21 @@ import { DEFAULT_ACK_MS } from '../services/control/src/engine.ts';
 import { startStack } from '../sim/stack.ts';
 import { DRILLS, WARMUP_MS, WINDOW_MS, runDrill } from '../sim/drills.ts';
 import { PRICE_ASSUMPTIONS, mergeImpact, pct } from './lib/impact.ts';
+import { releaseSection } from './lib/release-section.ts';
 
 const arg = (n: string, d: number) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const runs = arg('runs', 20), evalRuns = arg('cases', 3);
 const only = process.argv.includes('--no-write');
-const command = `node scripts/drill.ts --runs ${runs}` + (evalRuns !== 3 ? ` --cases ${evalRuns}` : '');
+const releaseOnly = process.argv.includes('--only') && process.argv[process.argv.indexOf('--only') + 1] === 'release';   // make drill-release
+const releaseRuns = arg('release-runs', 8);
+const command = `node scripts/drill.ts --runs ${runs}` + (evalRuns !== 3 ? ` --cases ${evalRuns}` : '') + (releaseRuns !== 8 ? ` --release-runs ${releaseRuns}` : '');
+const releaseCommand = releaseOnly ? `node scripts/drill.ts --only release --release-runs ${releaseRuns}` : command;
+if (releaseOnly) {   // merge only the release section; every other section of impact.json is kept
+  const release = await releaseSection(releaseRuns, releaseCommand);
+  if (!only) mergeImpact({ release });
+  console.log(JSON.stringify({ release: { ...release, timeToRollbackMs: { ...release.timeToRollbackMs, samples: undefined } } }, null, 1));
+  process.exit(0);
+}
 const tmp = () => mkdtempSync(join(tmpdir(), 'rollcall-drill-'));
 const r2 = (n: number, d = 4) => Math.round(n * 10 ** d) / 10 ** d;
 const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
@@ -98,10 +108,11 @@ const detector = {
   // Soft alerts (one signal: gentle throttle, no page) on any agent during a negative case. Hard ones are the fp above; soft ones are not counted as false alarms.
   softOnNegatives: { runs: negRuns, runsWithAlert: negAlertRuns },
 };
+const release = await releaseSection(releaseRuns, releaseCommand);
 if (!only) {
-  mergeImpact({ fleet, drill, detector, assumptions: await PRICE_ASSUMPTIONS() });
+  mergeImpact({ fleet, drill, detector, release, assumptions: await PRICE_ASSUMPTIONS() });
   mkdirSync('replay', { recursive: true });
   writeFileSync('replay/events.json', JSON.stringify(replay));
 }
-console.log(JSON.stringify({ drill: { ...drill, spendProtectedUsd: { ...drill.spendProtectedUsd, perRunUsd: undefined }, timeToContainMs: { ...drill.timeToContainMs, samples: undefined } }, detector }, null, 1));
+console.log(JSON.stringify({ release: { ...release, timeToRollbackMs: { ...release.timeToRollbackMs, samples: undefined } }, drill: { ...drill, spendProtectedUsd: { ...drill.spendProtectedUsd, perRunUsd: undefined }, timeToContainMs: { ...drill.timeToContainMs, samples: undefined } }, detector }, null, 1));
 console.log(`done in ${Math.round((Date.now() - t00) / 1000)} s`);

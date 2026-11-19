@@ -14,5 +14,5 @@ function sameShape(fx: any, real: any, path: string): void {
 }
 test('fixture impact has the same shape as the real impact.json', () => {
   const real = JSON.parse(readFileSync(new URL('../impact.json', import.meta.url), 'utf8'));
-  for (const sec of ['fleet', 'drill', 'detector', 'bench']) sameShape((FIXTURE_IMPACT as any)[sec], real[sec], sec);
+  for (const sec of ['fleet', 'drill', 'detector', 'release', 'bench']) sameShape((FIXTURE_IMPACT as any)[sec], real[sec], sec);
 });

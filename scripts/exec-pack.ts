@@ -39,6 +39,8 @@ ${stamp} ${SIM}
 | Spend kept out per runaway drill, mean (${V('drill.spendProtectedUsd.protectedTotal')} across all drills) | **${V('drill.spendProtectedUsd.protectedMean')}** | \`drill.spendProtectedUsd.protectedMean\` |
 | Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **${V('bench.overheadP99Ms')}** | \`bench.overheadP99Ms\` |
 
+**Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In ${V('release.badRuns')} drills with a faulty new version, ${V('release.autoRollbacks')} were rolled back automatically (p95 ${V('release.timeToRollbackMs.p95')} from the first faulty call); ${V('release.falseRollbacks')} good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted error budget (ADR-014).
+
 Also measured: ${V('fleet.registered')} agents registered and ${V('fleet.unregisteredRunning')} running without a record; detector precision ${V('detector.precision')} and recall ${V('detector.recall')} for HARD containment with ${V('detector.fp')} hard false alarms, at ${V('detector.runsPerCase')} runs per case (small and scripted); soft alerts, which only throttle gently, appeared in ${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')} negative-case runs; low-risk success ratio ${M('control-plane-stop', 'lowRiskDuringOutage.ratio')} while the control plane was stopped. Dollar amounts use price assumptions (\`cost-model.md\`), not real invoices.
 
 ## Top three risks and what we do about them
@@ -85,6 +87,19 @@ ${stamp} ${SIM}
 ## Architecture (C4 summary)
 
 Full diagrams: [\`docs/architecture.md\`](../docs/architecture.md). In short: a **control plane** (registry, identity issuer, policy bundle, incident engine, admission, kill and probe) and a **data plane** of gateway replicas that every agent call passes through (authN, revocation, scope, budget and throttle, policy, masking, forward, receipt). The backend has zero runtime dependencies (\`node:*\` only). Decisions are in \`docs/adr/\`.
+
+## Release gates and auto-rollback
+
+A version bump runs as a canary taking half of the agent's traffic under its own identity, so gateway events tell the two versions apart. Control judges it with \`evaluatePromotion\` (\`services/control/src/lifecycle.ts\`): evaluation evidence present, passed and fresh; drill regression; attack suite with zero escapes; canary error rate and p99 against stable; error budget not exhausted. Failing gates roll the canary back; passing ones promote it after the window. Design and thresholds: ADR-014.
+
+| Measured over ${V('release.badRuns')} bad-release and ${V('release.goodRuns')} good-release drills (simulated fleet, one fault kind) | Result | Field |
+|---|---|---|
+| Bad releases rolled back automatically | **${V('release.autoRollbacks')}** of ${V('release.badRuns')} | \`release.autoRollbacks\` |
+| Time to roll back from fault start, p50 / p95 | **${V('release.timeToRollbackMs.p50')}** / **${V('release.timeToRollbackMs.p95')}** | \`release.timeToRollbackMs\` |
+| Good releases promoted automatically | **${V('release.goodPromoted')}** of ${V('release.goodRuns')} | \`release.goodPromoted\` |
+| False rollbacks of good releases | **${V('release.falseRollbacks')}** | \`release.falseRollbacks\` |
+
+Reproduce: \`make drill-release\`. The production design (Argo Rollouts calling the same gate) is in \`deploy/k8s/rollouts/\` and is not exercised in this repo's cluster.
 
 ## Non-functional requirements: target vs measured
 

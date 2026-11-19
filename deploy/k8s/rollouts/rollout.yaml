@@ -1,0 +1,36 @@
+# DESIGN ONLY: not applied to any cluster. See README.md in this directory.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: invoice-recon
+  namespace: agents
+  labels:
+    rollcall.dev/agent-id: invoice-recon      # admission (ADR-013) refuses the workload without it
+spec:
+  replicas: 4
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels: {app: invoice-recon}
+  template:
+    metadata:
+      labels:
+        app: invoice-recon
+        rollcall.dev/agent-id: invoice-recon
+    spec:
+      containers:
+        - name: agent
+          image: registry.example.invalid/invoice-recon:1.1.0   # placeholder image
+  strategy:
+    canary:
+      # Weights mirror POLICY.canaryShare = 50% at the last step; the first step is a smaller probe.
+      steps:
+        - setWeight: 20
+        - analysis:
+            templates: [{templateName: rollcall-promotion-gate}]
+            args: [{name: agent-id, value: invoice-recon}]
+        - setWeight: 50
+        - analysis:
+            templates: [{templateName: rollcall-promotion-gate}]
+            args: [{name: agent-id, value: invoice-recon}]
+      # A failed analysis aborts the rollout and scales the canary down: automatic rollback to the stable ReplicaSet.
+      abortScaleDownDelaySeconds: 30

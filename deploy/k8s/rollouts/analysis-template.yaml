@@ -1,0 +1,37 @@
+# DESIGN ONLY: not applied to any cluster. See README.md in this directory.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: rollcall-promotion-gate
+  namespace: agents
+spec:
+  args:
+    - name: agent-id
+    - name: control-url
+      value: http://rollcall-control.rollcall-system.svc:7100
+  metrics:
+    # Roll Call is the single owner of the gate rules (ADR-014): evaluation evidence, drill regression,
+    # attack suite, canary error rate and p99 against stable, error budget. dryRun=1 evaluates without changing the record.
+    - name: rollcall-gate
+      interval: 30s
+      count: 4
+      failureLimit: 0
+      provider:
+        web:
+          url: "{{args.control-url}}/v1/agents/{{args.agent-id}}/promote?dryRun=1&to=production"
+          method: POST
+          timeoutSeconds: 5
+          jsonPath: "{$.allowed}"
+      successCondition: result == true
+    # Optional second opinion straight from the gateway counters. Needs an agent label on the metric (see README).
+    - name: slo-error-ratio
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc:9090
+          query: |
+            sum(rate(rollcall_gateway_decisions_total{verdict!="allow"}[2m]))
+            / clamp_min(sum(rate(rollcall_gateway_decisions_total[2m])), 1)
+      successCondition: result[0] <= 0.01

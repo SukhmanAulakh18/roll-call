@@ -50,8 +50,11 @@ export function createReleases(d: ReleaseDeps) {
 
   async function promote(agentId: string, to: LifecycleState, dryRun = false): Promise<PromotionResult> {
     const rec = d.registry.get(agentId); if (!rec) throw new Error(`no agent '${agentId}'`);
-    const res = evaluatePromotion(rec, evidence(agentId, to, active().find(r => r.agentId === agentId)));
+    const rel = active().find(r => r.agentId === agentId);
+    const viaRelease = !!rel && to === 'production';              // a running canary is judged as the canary it is, even when the agent is already in production
+    const res = evaluatePromotion(viaRelease ? { ...rec, lifecycleState: 'canary' } : rec, evidence(agentId, to, rel));
     if (dryRun || !res.allowed) return { ...res, dryRun };
+    if (viaRelease) { await promoteRelease(rel, res); return { ...res, dryRun, record: d.registry.get(agentId) }; }
     const next: AgentRecord = { ...rec, lifecycleState: to };
     d.registry.upsert(next);
     if (to === 'retired') { for (const r of active().filter(x => x.agentId === agentId)) await abort(r, 'the agent was retired'); await d.runtime()?.stop(agentId); }
