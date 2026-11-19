@@ -1,6 +1,6 @@
 # Roll Call: technical brief
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T07:19:06.564Z, gitSha 1a8d073 (chaos section run at 2026-11-19T07:19:06.564Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T08:45:37.110Z, gitSha 8cf416e (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
 
 ## Architecture (C4 summary)
 
@@ -10,13 +10,18 @@ Full diagrams: [`docs/architecture.md`](../docs/architecture.md). In short: a **
 
 | Requirement | Target | Measured | Field |
 |---|---|---|---|
-| Gateway decision path p99 | at most 50 ms | 0.0901 ms | `bench.governed.p99` |
-| Overhead vs ungoverned, p99 (end to end) | not set | 0.87 ms | `bench.overheadP99Ms` |
+| Gateway decision path p99 (in-process timer around the decision code only; excludes I/O and TLS) | at most 50 ms | 0.0901 ms | `bench.governed.p99` |
+| End-to-end p99, governed (loopback, no TLS, single process) | not set | 14.50 ms | `bench.governed.endToEnd.p99` |
+| End-to-end p99, ungoverned (same setup) | not set | 13.63 ms | `bench.direct.endToEnd.p99` |
+| Overhead = difference of the two end-to-end p99s above. Not production latency | not set | 0.87 ms | `bench.overheadP99Ms` |
 | Time to detect, p95 | at most 10000 ms | 752 ms | `drill.stagesP95Ms.detected` |
-| Time to contain, p95 (over 20 drills) | at most 30000 ms | 2225 ms | `drill.timeToContainMs.p95` |
-| Time to contain, p50 | not set | 2026 ms | `drill.timeToContainMs.p50` |
+| Time to contain, p95 (over 20 drills) | at most 30000 ms | 2227 ms | `drill.timeToContainMs.p95` |
+| Time to hard throttle and page, p95 (automatic part) | not set | 752 ms | `drill.stagesP95Ms.paged` |
+| Simulated owner acknowledgement included in time to contain | configured | 1000 ms | `drill.simulatedOwnerAckMs` |
+| Time to contain, p50 | not set | 2028 ms | `drill.timeToContainMs.p50` |
 | Spend kept out per runaway drill, mean | not set | $0.66 | `drill.spendProtectedUsd.protectedMean` |
-| Detector false alarms / missed | none | 0 / 0 | `detector.fp`, `detector.fn` |
+| Detector HARD false alarms / missed (n = 3 runs per case) | none | 0 / 0 | `detector.fp`, `detector.fn` |
+| Negative-case runs with a soft alert on any agent (soft alerts are not counted as false alarms) | not set | 6 of 9 | `detector.softOnNegatives` |
 | Data plane availability | 99.95% (target) | not measured as a percentage; see game days below | docs/availability-model.md |
 | Control plane availability | 99.9% (target) | not measured as a percentage; see game days below | docs/availability-model.md |
 
@@ -26,11 +31,11 @@ Gateways act on a cached policy bundle and poll control in the background (ADR-0
 
 | Game day | Result | Fields |
 |---|---|---|
-| Control plane stopped, then restarted | Low-risk success ratio 1.00; high-risk denied after the bundle went stale: 1.00; gateway marked it stale (MTTD) 2008 ms after the stop; normal operation (MTTR) 13 ms after restart; new identity and admission refused during the outage. | `chaos.scenarios.control-plane-stop` |
-| Identity issuer fails | Token TTL in this test 3000 ms; latest first denial 2107 ms after the fault; calls allowed on an expired token 0; agents recovered without a restart. | `chaos.scenarios.identity-issuer-down` |
+| Control plane stopped, then restarted | Low-risk success ratio 1.00; high-risk denied after the bundle went stale: 1.00; gateway marked it stale (MTTD) 2003 ms after the stop; normal operation (MTTR) 209 ms after restart; new identity and admission refused during the outage. | `chaos.scenarios.control-plane-stop` |
+| Identity issuer fails | Token TTL in this test 3000 ms; latest first denial 2217 ms after the fault; calls allowed on an expired token 0; agents recovered without a restart. | `chaos.scenarios.identity-issuer-down` |
 | One of two gateway replicas killed | Error rate after the loss: 0.50 without agent-side failover, 0.00 with it. **Finding:** the fleet had no failover and sent about half its calls to the dead replica; the fix retries the other replica only on connection refused. | `chaos.scenarios.gateway-replica-loss` |
 | Malformed or rejected policy bundle | Lowest low-risk success ratio across four variants 1.00; last good bundle kept in every variant: true. **Finding:** a well-formed but wrong-shaped bundle used to replace the good one and break the gateway; the gateway now validates the shape (`services/gateway/src/app.ts`, unit test in `gateway.test.ts`). | `chaos.scenarios.bad-policy-bundle` |
-| Event endpoint hangs | Decision success ratio 1.00 during the fault; 408 events dropped and counted at the buffer bound; delivered plus dropped equals decisions: true. | `chaos.scenarios.telemetry-backlog` |
+| Event endpoint hangs | Decision success ratio 1.00 during the fault; 410 events dropped and counted at the buffer bound; delivered plus dropped equals decisions: true. | `chaos.scenarios.telemetry-backlog` |
 
 Each game day records its hypothesis, steady state, blast radius, abort condition and recovery in impact.json. Limits: the faults are injected in-process (not Chaos Mesh on a cluster); the gateway close is graceful, not a crash; a revocation issued during a control outage cannot reach gateways (ADR-004, accepted limit).
 

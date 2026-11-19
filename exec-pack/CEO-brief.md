@@ -1,6 +1,6 @@
 # Roll Call: executive brief
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T07:19:06.564Z, gitSha 1a8d073 (chaos section run at 2026-11-19T07:19:06.564Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T08:45:37.110Z, gitSha 8cf416e (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
 
 ## The problem: four questions about every AI agent
 
@@ -15,17 +15,18 @@ Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T07:19
 
 | What | Result | Field in impact.json |
 |---|---|---|
-| Time to contain a runaway agent, p95 (over 20 drills) | **2225 ms** | `drill.timeToContainMs.p95` |
+| Time to contain a runaway agent, p95 (over 20 drills; includes a SIMULATED owner acknowledgement of 1000 ms) | **2227 ms** | `drill.timeToContainMs.p95` |
+| Of which time to hard throttle and page, p95 (automatic, no human) | **752 ms** | `drill.stagesP95Ms.paged` |
 | Spend kept out per runaway drill, mean ($13.21 across all drills) | **$0.66** | `drill.spendProtectedUsd.protectedMean` |
-| Added decision latency at p99, governed vs ungoverned | **0.87 ms** | `bench.overheadP99Ms` |
+| Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **0.87 ms** | `bench.overheadP99Ms` |
 
-Also measured: 12 agents registered and 0 running without a record; detector precision 1.00 and recall 1.00 with 0 false alarms on the labelled drills; low-risk success ratio 1.00 while the control plane was stopped. Dollar amounts use price assumptions (`cost-model.md`), not real invoices.
+Also measured: 12 agents registered and 0 running without a record; detector precision 1.00 and recall 1.00 for HARD containment with 0 hard false alarms, at 3 runs per case (small and scripted); soft alerts, which only throttle gently, appeared in 6 of 9 negative-case runs; low-risk success ratio 1.00 while the control plane was stopped. Dollar amounts use price assumptions (`cost-model.md`), not real invoices.
 
 ## Top three risks and what we do about them
 
 1. **The results are from simulation.** Agents are scripted and faults are injected by us. *Mitigation:* the 30-day pilot phase is read-only discovery on real traffic, so baselines come from real agents before any enforcement.
 2. **Failing closed has a business cost.** If the control plane is unreachable, high-risk tools are refused after the policy goes stale. *Mitigation:* low-risk work continued in the game day and high-risk calls were denied on purpose; the staleness limit is a setting the risk owner chooses (`docs/runbooks/control-plane-down.md`).
-3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged first. Measured false alarms are 0 on the labelled set, which is small and synthetic; the pilot measures this on real traffic.
+3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged first. Measured hard false alarms are 0 on the labelled set (3 runs per case, small and synthetic), and soft alerts appeared in 6 of 9 negative-case runs; the pilot measures this on real traffic.
 
 ## Build, buy or extend
 
