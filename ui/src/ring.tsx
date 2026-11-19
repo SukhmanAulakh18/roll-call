@@ -61,7 +61,7 @@ export function RollRing({ selected, onSelect, focus = null, compact = false }: 
   const sel = shown ? rows.find((r) => r.a.id === shown) : undefined;
   const fp = focus ? rows.find((r) => r.a.id === focus) : undefined;
   const fpos = fp ? pos(fp.i) : null;
-  const scale = fp ? 1.9 : 1;
+  const scale = fp ? 1.5 : 1;
   const zoom: CSSProperties = fpos ? { transform: `translate(${(-(fpos.x / VW - 0.5) * scale * 100).toFixed(2)}%, ${(-(fpos.y / VH - 0.5) * scale * 100).toFixed(2)}%) scale(${scale})` } : {};
 
   const move = (e: KeyboardEvent, i: number) => {

@@ -5,7 +5,7 @@
 /* Hallmark · waive 37 · tokens.css --font-display, --font-body, --font-outlier · three named families (condensed display, grotesk body, mono for numerals); the fourth hit is the generic sans-serif/monospace fallback */
 /* Hallmark · waive 24b · .scrub input::-webkit-slider-thumb margin-top -7px · optical centring of a 22px thumb on an 8px track, not a spacing choice */
 /* Note: the footer string with middle dots is the owner's required wording, set verbatim in App.tsx. */
-@import "@fontsource-variable/big-shoulders-display/wght";
+@import "@fontsource-variable/source-serif-4/wght.css";
 @import "@fontsource-variable/instrument-sans/wght";
 @import "@fontsource-variable/martian-mono/wght";
 @import "@xyflow/react/dist/base.css";

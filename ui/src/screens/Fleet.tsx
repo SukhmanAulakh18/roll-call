@@ -279,6 +279,37 @@ function IncidentBanner() {
   );
 }
 
+
+// ---------------- business band ----------------
+function BusinessBand() {
+  const impact = useStore((s) => s.impact);
+  const fleet = useStore((s) => s.fleet);
+  const d = impact?.drill;
+  const kept = d?.spendProtectedUsd?.protectedTotal;
+  const p95 = d?.timeToContainMs?.p95;
+  const NM = <span className="biz-na">not measured yet</span>;
+  return (
+    <section className="biz" data-tour="biz" aria-labelledby="biz-h">
+      <h1 id="biz-h" className="biz-h">Banks are going from a few AI pilots to thousands of agents.</h1>
+      <div className="biz-grid">
+        <div className="biz-problem">
+          <p className="biz-k">The problem: four questions nobody can answer fast</p>
+          <ol className="biz-q"><li>What agents exist?</li><li>What does it cost?</li><li>Can I stop one, fast?</li><li>Can I prove it?</li></ol>
+        </div>
+        <div className="biz-answer">
+          <p className="biz-k">Roll Call answers all four, live</p>
+          <ul className="biz-out">
+            <li><span className="biz-n measured">{isNum(kept) ? usd(kept) : NM}</span><span className="biz-l">spend protected{isNum(d?.runs) ? <> over {d.runs} runaway drills</> : null}</span></li>
+            <li><span className="biz-n measured">{isNum(p95) ? secs(p95) : NM}</span><span className="biz-l">time to contain, p95, with a simulated owner ack{isNum(d?.simulatedOwnerAckMs) ? <> of {secs(d.simulatedOwnerAckMs)}</> : null} (no real person is paged)</span></li>
+            <li><span className="biz-n measured">{fleet ? `${fleet.registered} registered, ${fleet.unregisteredRunning} unregistered` : NM}</span><span className="biz-l">agents under control</span></li>
+          </ul>
+        </div>
+      </div>
+      <p className="biz-why"><strong>Why now:</strong> OSFI E-23 (model risk management) takes effect May 1, 2027 and expects a live, owned inventory. This is an engineering interpretation, not compliance advice.</p>
+    </section>
+  );
+}
+
 // ---------------- screen ----------------
 export function Fleet({ selected }: { selected: string | null }) {
   const [view, setView] = useLocal<'roll' | 'topology'>('view', 'roll');
@@ -287,11 +318,12 @@ export function Fleet({ selected }: { selected: string | null }) {
   const source = useStore((s) => s.source);
   return (
     <div className="fleet">
+      <BusinessBand />
       <section className={`hero ${selected ? 'has-side' : ''}`}>
         <div className="hero-l">
           {selected ? <AgentPanel id={selected} onClose={() => select(null)} /> : (
             <>
-              <h1 className="hero-h">Every agent answers the roll.</h1>
+              <h2 className="hero-h">Every agent answers the roll.</h2>
               <p className="hero-p">Roll Call watches a bank's AI agents (software workers) and can stop one that goes wrong, with proof.</p>
               <div className="hero-a">
                 <button className="btn btn--primary btn--lg" onClick={goDrill}><Play size={16} aria-hidden />Run a drill</button>

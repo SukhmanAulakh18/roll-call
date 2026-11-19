@@ -17,12 +17,12 @@ const DRILLS = [
 ] as const;
 const WARMUP_GUESS = 5000; // sim/drills.ts WARMUP_MS: the real drill warms the fleet up for 5 s before injecting the fault
 const STEPS: { stage: IncidentStage; label: string; plain: string }[] = [
-  { stage: 'detected', label: 'Detect', plain: 'The control plane notices an agent is off its own baseline.' },
-  { stage: 'throttled', label: 'Throttle', plain: 'Calls are slowed so spend stops climbing.' },
-  { stage: 'paged', label: 'Page', plain: 'The owner is paged (simulated).' },
-  { stage: 'owner_ack', label: 'Owner ack', plain: 'The owner acknowledges (simulated).' },
-  { stage: 'killed', label: 'Kill', plain: 'The agent identity is revoked.' },
-  { stage: 'proof', label: 'Proof', plain: 'A probe tries to act and is refused.' },
+  { stage: 'detected', label: 'Detect', plain: 'Off its own baseline.' },
+  { stage: 'throttled', label: 'Throttle', plain: 'Calls slowed, spend flattens.' },
+  { stage: 'paged', label: 'Page', plain: 'Owner paged (simulated).' },
+  { stage: 'owner_ack', label: 'Owner ack', plain: 'Owner replies (simulated).' },
+  { stage: 'killed', label: 'Kill', plain: 'Agent identity revoked.' },
+  { stage: 'proof', label: 'Proof', plain: 'A probe is refused.' },
 ];
 
 interface Pt { t: number; v: number }
@@ -50,7 +50,7 @@ function RaceChart({ title, tone, pts, max, maxT, ph, marks = [], state, note }:
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}: cumulative spend ${last ? usd(last.v) : 'none yet'} after ${last ? last.t.toFixed(1) : '0'} seconds`}>
         {[0, 0.5, 1].map((f) => (<g key={f}><line x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} className="grid" /><text x={L - 8} y={y(max * f) + 4} textAnchor="end" className="axis">{usd(max * f)}</text></g>))}
         {[0, 0.5, 1].map((f) => <text key={f} x={x(maxT * f)} y={H - 8} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'} className="axis">{(maxT * f).toFixed(0)} s</text>)}
-        {marks.filter((m) => ph == null || m.t <= ph).map((m) => (<g key={m.text}><line x1={x(m.t)} x2={x(m.t)} y1={T} y2={H - B} className="mark" /><text x={x(m.t) + 5} y={T + 12} className="mark-t">{m.text}</text></g>))}
+        {marks.filter((m) => ph == null || m.t <= ph).map((m, mi) => { const right = x(m.t) > W - R - 80; return (<g key={m.text}><line x1={x(m.t)} x2={x(m.t)} y1={T} y2={H - B} className="mark" /><text x={right ? x(m.t) - 5 : x(m.t) + 5} textAnchor={right ? 'end' : 'start'} y={T + 12 + mi * 18} className="mark-t">{m.text}</text></g>); })}
         {shown.length > 1 && <><path d={`${d}L${x(last.t).toFixed(1)},${y(0)}L${x(0)},${y(0)}Z`} className="area" /><path d={d} className="line" /></>}
         {last && <><circle cx={x(last.t)} cy={y(last.v)} r="5" className="dot" /><text x={Math.min(x(last.t) - 8, W - R - 4)} y={y(last.v) < T + 26 ? y(last.v) + 22 : y(last.v) - 10} textAnchor="end" className="endlabel">{usd(last.v)}</text></>}
       </svg>
@@ -177,7 +177,7 @@ function Stepper({ g, res, t0, running, ph }: { g: ReturnType<typeof groupIncide
             <span className="step-i" aria-hidden="true">{done ? <Check size={14} /> : <span className="step-n">{i + 1}</span>}</span>
             <span className="step-t">{s.label}</span>
             <span className="step-time measured">{ms != null ? `+${(ms / 1000).toFixed(1)} s` : cur ? 'now' : 'waiting'}</span>
-            <span className="step-m">{done && e?.message ? e.message : s.plain}</span>
+            <span className="step-m">{s.plain}</span>{done && e?.message && <details className="step-more"><summary>Details</summary><p>{e.message}</p></details>}
             {done && <span className="visually-hidden"> done</span>}
           </motion.li>
         );

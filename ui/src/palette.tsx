@@ -50,7 +50,7 @@ export function Palette({ theme, setTheme }: { theme: 'dark' | 'light'; setTheme
                 {(['exec', 'ops', 'eng'] as const).map((l) => <Command.Item key={l} value={`lens ${l}`} onSelect={run(() => { setUi({ lens: l }); try { localStorage.setItem('rc.lens', JSON.stringify(l)); } catch { /* ignore */ } go('#/'); })}><Monitor size={16} aria-hidden />Switch lens to {l === 'exec' ? 'Executive' : l === 'ops' ? 'Operations' : 'Engineering'}</Command.Item>)}
                 <Command.Item onSelect={run(() => { setUi({ presenter: !presenter }); try { localStorage.setItem('rc.presenter', JSON.stringify(!presenter)); } catch { /* ignore */ } })}><Monitor size={16} aria-hidden />{presenter ? 'Turn off presenter mode' : 'Turn on presenter mode'}</Command.Item>
                 <Command.Item onSelect={run(() => setTheme(theme === 'dark' ? 'light' : 'dark'))}><Moon size={16} aria-hidden />Switch to {theme === 'dark' ? 'light' : 'dark'} theme</Command.Item>
-                <Command.Item onSelect={run(() => setUi({ tour: 0 }))}><GraduationCap size={16} aria-hidden />Start the 40-second presenter tour</Command.Item>
+                <Command.Item onSelect={run(() => setUi({ tour: 0 }))}><GraduationCap size={16} aria-hidden />Start the presenter tour</Command.Item>
               </Command.Group>
             </Command.List>
           </Command>

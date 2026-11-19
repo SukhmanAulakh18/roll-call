@@ -34,7 +34,7 @@ const useRoute = () => {
 
 export function App() {
   const [lens, setLens] = useLocal<Lens>('lens', 'exec');
-  const [theme, setTheme] = useLocal<'dark' | 'light'>('theme', 'dark');
+  const [theme, setTheme] = useLocal<'dark' | 'light'>('theme', 'light');
   const [presenter, setPresenter] = useLocal('presenter', false);
   const route = useRoute();
   const main = useRef<HTMLElement>(null);
