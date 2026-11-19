@@ -98,7 +98,7 @@ export function KillDialog() {
       const ev = await killAgent(id);
       setProof(ev);
       if (ev.stage === 'kill_unconfirmed') toast.error(`KILL NOT PROVEN: ${agent?.name ?? id}`, { description: ev.message, duration: Infinity });
-      else toast.success(`${agent?.name ?? id} stopped`, { description: ev.proof ? `Probe denied (${ev.proof.code}).` : 'Kill sent.' });
+      else toast.success(getState().source === 'recorded' ? `Recorded proof for ${agent?.name ?? id}` : `${agent?.name ?? id} stopped`, { description: ev.proof ? `Probe denied (${ev.proof.code}).` : 'Kill sent.' });
     } catch (e) { setErr((e as Error).message); }
     setBusy(false);
   };

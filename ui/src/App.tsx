@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
-import { Command as CmdIcon, GraduationCap, Moon, Presentation, Sun } from 'lucide-react';
-import { FIXTURE, start, useStore } from './store';
+import { Command as CmdIcon, GraduationCap, Moon, Presentation, Sun, Video } from 'lucide-react';
+import { FIXTURE, REPLAY_ONLY, start, useStore } from './store';
 import { setUi, useUi } from './ui-state';
 import { FixtureChip, TipProvider, VerifySheet, useLocal } from './ui';
 import { KillDialog, ReceiptDialog } from './components';
@@ -61,7 +61,8 @@ export function App() {
   const selected = r0 === 'agent' ? r1 ?? null : null;
   const page = r0 === 'drill' ? <Drill /> : r0 === 'admission' ? <Admission /> : r0 === 'money' || r0 === 'spend' || r0 === 'value' ? <Money tab={r0 === 'money' ? r1 : r0 === 'spend' ? 'spend' : 'value'} />
     : r0 === 'engineering' ? <Engineering /> : r0 === 'registry' ? <Registry /> : isReplay ? <Replay /> : <Fleet selected={selected} />;
-  const status = source === 'replay' ? 'Replay, recorded' : source === 'fixture' ? 'Fixture simulator' : connected ? 'Live stream connected' : 'Stream not connected';
+  const recorded = REPLAY_ONLY || source === 'recorded';
+  const status = source === 'recorded' ? 'Recorded run, looping' : source === 'replay' ? 'Replay, recorded' : source === 'fixture' ? 'Fixture simulator' : connected ? 'Live stream connected' : 'Stream not connected';
 
   return (
     <TipProvider>
@@ -75,9 +76,11 @@ export function App() {
               const cur = p === '' ? r0 === '' || r0 === 'agent' : r0 === p || (p === 'money' && (r0 === 'spend' || r0 === 'value'));
               return <a key={k} href={`#/${p}`} aria-current={cur ? 'page' : undefined}>{label}</a>;
             })}
+            {recorded && <a href="video.html" className="nav-video"><Video size={14} aria-hidden />Watch the 66 s video</a>}
           </nav>
           <div className="topbar-r">
             {FIXTURE && <FixtureChip />}
+            {recorded && <span className="chip chip--cool rec-badge" role="status" title="Every number on this site comes from a recorded run of the simulated fleet. The live stream is the recording, looped at real speed.">Recorded run · no live backend</span>}
             <div className="seg seg--lens" role="radiogroup" aria-label="Lens">
               {LENSES.map((l) => <button key={l.id} role="radio" aria-checked={lens === l.id} onClick={() => { setLens(l.id); location.hash = '#/'; }}>{l.label}</button>)}
             </div>
@@ -93,7 +96,7 @@ export function App() {
       </main>
       <footer className="footer">
         <div className="footer-in">
-          <p>Simulated fleet · real controls · every number from the last run ({source === 'fixture' ? 'FIXTURE, no real run' : impact?.generatedAt ? new Date(impact.generatedAt).toLocaleString() : 'no run yet'}) · not affiliated with any company</p>
+          <p>Simulated fleet · real controls · every number from the {recorded ? 'recorded run' : 'last run'} ({source === 'fixture' ? 'FIXTURE, no real run' : impact?.generatedAt ? new Date(impact.generatedAt).toLocaleString() : 'no run yet'}) · not affiliated with any company</p>
           <p className="footer-r"><span className={`chip ${connected || source !== 'live' ? 'chip--cool' : ''}`} role="status">{status}</span><span className="measured">Updated {updatedAt ? new Date(updatedAt).toLocaleTimeString([], { hour12: false }) : 'never'}</span></p>
         </div>
       </footer>

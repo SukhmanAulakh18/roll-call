@@ -5,8 +5,8 @@ export type GroupBy = 'team' | 'risk';
 const RISK_ORDER = ['critical', 'high', 'medium', 'low'];
 export const groupKey = (a: AgentRecord, by: GroupBy) => (by === 'team' ? a.owner.team : `${a.riskRating} risk`);
 
-export const AGENT_W = 236, AGENT_H = 92, AGENT_PITCH = 104;
-export const TOOL_X = 440, TOOL_W = 168, RIGHT_X = 846, NODE_PITCH = 30, NODE_H = 26;
+export const AGENT_W = 300, AGENT_H = 122, AGENT_PITCH = 142;
+export const TOOL_X = 520, TOOL_W = 230, RIGHT_X = 1070, NODE_PITCH = 42, NODE_H = 34;
 
 export interface Layout {
   agents: { id: string; x: number; y: number; side: 'l' | 'r'; group: string }[];

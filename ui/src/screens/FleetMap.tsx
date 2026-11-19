@@ -1,7 +1,7 @@
-import { createContext, memo, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BaseEdge, Background, BackgroundVariant, Controls, EdgeLabelRenderer, Handle, MiniMap, Position, ReactFlow, ReactFlowProvider, getBezierPath, useReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react';
 import { useReducedMotion } from 'motion/react';
-import { Database, Search, Wrench, Rows3, ShieldAlert, Maximize2 } from 'lucide-react';
+import { Database, Search, Wrench, Rows3, ShieldAlert, Maximize2, Expand, Shrink } from 'lucide-react';
 import type { AgentRecord } from '../../../contracts/types';
 import { getState, useStore } from '../store';
 import { Initials, Sparkline, StateIcon, Tip, stateLabel, usd, useLocal, useNow, type AgentState } from '../ui';
@@ -36,7 +36,7 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps<Node<{ agent: Agen
             <span className="anode-name">{a.name}</span>
             <span className="anode-group">{group}</span>
             <span className="anode-meta">
-              <Sparkline values={hist} w={74} h={20} tone={state === 'killed' ? 'muted' : state === 'healthy' ? 'cool' : 'warn'} label={`${a.name} spend per minute trend`} />
+              <Sparkline values={hist} w={110} h={28} tone={state === 'killed' ? 'muted' : state === 'healthy' ? 'cool' : 'warn'} label={`${a.name} spend per minute trend`} />
               <span className="measured">{typeof rate === 'number' ? `${usd(rate, 3)}/min` : 'no rate yet'}</span>
             </span>
           </span>
@@ -54,8 +54,8 @@ const ToolNode = memo(function ToolNode({ data }: NodeProps<Node<{ name: string;
   return (
     <div className={`tnode k-${data.kind} ${data.hot ? 'is-hot' : ''} ${data.drift ? 'is-drift' : ''} ${data.dim ? 'is-dim' : ''}`} style={{ width: TOOL_W, height: NODE_H }} title={data.name}>
       <Handle id="tl" type="target" position={Position.Left} isConnectable={false} /><Handle id="tr" type="target" position={Position.Right} isConnectable={false} />
-      {data.kind === 'data' ? <Database size={12} aria-hidden /> : <Wrench size={12} aria-hidden />}<span className="measured">{label}</span>
-      {data.drift && <ShieldAlert size={12} aria-label="out-of-scope call seen" />}
+      {data.kind === 'data' ? <Database size={15} aria-hidden /> : <Wrench size={15} aria-hidden />}<span className="measured">{label}</span>
+      {data.drift && <ShieldAlert size={15} aria-label="out-of-scope call seen" />}
     </div>
   );
 });
@@ -99,6 +99,19 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | AgentState>('all');
   const [hover, setHover] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState(false);   // true in native fullscreen or in the modal fallback
+  const [modal, setModal] = useState(false);
+  const refit = useCallback(() => setTimeout(() => rf.fitView({ padding: 0.04, duration: 0 }), 150), [rf]);
+  useEffect(() => { const f = () => { setFull(document.fullscreenElement === root.current); refit(); }; document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, [refit]);
+  useEffect(() => { if (!modal) return; const f = (e: KeyboardEvent) => { if (e.key === 'Escape') { setModal(false); setFull(false); refit(); } }; addEventListener('keydown', f); return () => removeEventListener('keydown', f); }, [modal, refit]);
+  const toggleFull = () => {
+    if (modal) { setModal(false); setFull(false); refit(); return; }
+    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
+    const el = root.current;
+    if (el?.requestFullscreen) el.requestFullscreen().catch(() => { setModal(true); setFull(true); refit(); });
+    else { setModal(true); setFull(true); refit(); }
+  };
 
   const agents = useMemo(() => {
     if (!focus) return allAgents;
@@ -179,12 +192,13 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
   }, [agents, lay, stats, focusId, dim, cycle, focus, newestTs, now, driftTool]);
 
   const ctx: MapCtx = useMemo(() => ({ select: (id) => onSelect(id), selected, hover, setHover, dim, by, reduce }), [selected, hover, dim, by, reduce, onSelect]);
-  useEffect(() => { const h = setTimeout(() => rf.fitView({ padding: 0.06, duration: reduce ? 0 : 400 }), 60); return () => clearTimeout(h); }, [by, lay.agents.length, lay.tools.length, focus, compact, rf, reduce]);
+  useEffect(() => { const h = setTimeout(() => rf.fitView({ padding: 0.04, duration: reduce ? 0 : 400 }), 60); return () => clearTimeout(h); }, [by, lay.agents.length, lay.tools.length, focus, compact, rf, reduce]);
 
   const counts = useMemo(() => { const c: Record<string, number> = { all: allAgents.length }; for (const a of allAgents) { const s = states?.[a.id] ?? 'unknown'; c[s] = (c[s] ?? 0) + 1; } return c; }, [allAgents, states]);
 
   return (
     <Ctx.Provider value={ctx}>
+      <div ref={root} className={`map-root ${modal ? 'map-root--modal' : ''}`} {...(modal ? { role: 'dialog', 'aria-modal': true, 'aria-label': 'Fleet map, full screen' } : {})}>
       {!compact && (
         <div className="map-bar" role="toolbar" aria-label="Fleet map controls">
           <label className="search"><Search size={14} aria-hidden /><span className="visually-hidden">Search agents, teams or tools</span><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search agents or tools" /></label>
@@ -195,11 +209,12 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
           <div className="seg" role="group" aria-label="Filter by state">
             {(['all', 'healthy', 'alert', 'throttled', 'killed'] as const).map((f) => <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} disabled={f !== 'all' && !counts[f]}>{f === 'all' ? 'All' : f === 'alert' ? 'Alert' : f === 'throttled' ? 'Slowed' : f === 'killed' ? 'Stopped' : 'Healthy'}<span className="measured">{counts[f] ?? 0}</span></button>)}
           </div>
-          <button type="button" className="btn btn--sm" onClick={() => rf.fitView({ padding: 0.06, duration: reduce ? 0 : 400 })}><Maximize2 size={14} aria-hidden />Fit view</button>
+          <button type="button" className="btn btn--sm" onClick={() => rf.fitView({ padding: 0.04, duration: reduce ? 0 : 400 })}><Maximize2 size={14} aria-hidden />Fit view</button>
+          <button type="button" className="btn btn--sm" aria-pressed={full} onClick={toggleFull}>{full ? <Shrink size={14} aria-hidden /> : <Expand size={14} aria-hidden />}{full ? 'Exit full screen' : 'Full screen'}</button>
         </div>
       )}
       <div className="map-canvas" aria-label="Fleet map. Agents on the outside, tools and data in the middle. Use the cards to open an agent." role="group">
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView minZoom={0.25} maxZoom={1.6} nodesDraggable={false} nodesConnectable={false} nodesFocusable={false} edgesFocusable={false} elementsSelectable={false} proOptions={{ hideAttribution: true }} onPaneClick={() => onSelect(null)} zoomOnDoubleClick={false}>
+        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView fitViewOptions={{ padding: 0.04 }} minZoom={0.35} maxZoom={1.8} nodesDraggable={false} nodesConnectable={false} nodesFocusable={false} edgesFocusable={false} elementsSelectable={false} proOptions={{ hideAttribution: true }} onPaneClick={() => onSelect(null)} zoomOnDoubleClick={false}>
           <Background variant={BackgroundVariant.Dots} gap={22} size={1} className="rf-dots" />
           {!compact && <Controls showInteractive={false} position="bottom-left" aria-label="Map zoom controls" />}
           {!compact && <MiniMap pannable zoomable position="bottom-right" ariaLabel="Fleet minimap" nodeStrokeWidth={2} nodeColor={(n) => (n.type === 'agent' ? 'var(--color-rule-2)' : 'var(--color-rule)')} maskColor="var(--color-scrim)" />}
@@ -208,6 +223,7 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
         {agents.length === 0 && <p className="map-empty"><Rows3 size={16} aria-hidden /> Waiting for the registry to load.</p>}
       </div>
       {!compact && <p className="visually-hidden" aria-live="polite">{inc ? `Incident on ${inc.agentId}: ${inc.last.stage}` : 'No incident'}</p>}
+      </div>
     </Ctx.Provider>
   );
 }

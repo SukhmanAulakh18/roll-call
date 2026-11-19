@@ -40,7 +40,7 @@ export function Replay() {
         <p className="muted scrub-legend">Ticks on the track are incident stages: detect, throttle, page, kill, proof.</p>
       </section>
 
-      {wide ? <Panel title="Fleet at this moment" id="rm-h"><div className="map-frame map-frame--s"><FleetMap selected={null} onSelect={() => undefined} /></div></Panel> : (
+      {wide ? <Panel title="Fleet at this moment" id="rm-h"><div className="map-frame"><FleetMap selected={null} onSelect={() => undefined} /></div></Panel> : (
         <Panel title="Fleet at this moment" id="rg-h">
           <ul className="agrid">{agents.map((a) => <li key={a.id}><span className="agrid-n"><Initials name={a.owner.name} size={22} />{a.name}</span><StateMark state={(states?.[a.id] ?? 'unknown') as AgentState} /></li>)}</ul>
         </Panel>

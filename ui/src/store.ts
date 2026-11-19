@@ -2,11 +2,16 @@ import { useSyncExternalStore } from 'react';
 import type { ActionEvent, AdmissionResult, AgentRecord, DrillResult, FleetSummary, IncidentEvent, LifecycleState, PromotionResult, StreamMessage } from '../../contracts/types';
 import { FIXTURE_IMPACT } from './fixtures/FIXTURE_impact';
 import { FIXTURE_AGENTS } from './fixtures/FIXTURE_agents';
+import { admit, checkRecord } from '../../services/control/src/admission.ts';
+import { evaluatePromotion } from '../../services/control/src/lifecycle.ts';
 import { chainAction, fixtureBaseline, fixtureDrill, fixtureFleet, fixtureProbe, fixturePromote, fixtureRelease, startFixtureSim, verifyFixtureChain } from './fixtures/FIXTURE_stream';
 
 export const FIXTURE = new URLSearchParams(location.search).get('fixture') === '1';
 export type Impact = Record<string, any>;
-export type Source = 'live' | 'fixture' | 'replay';
+export type Source = 'live' | 'fixture' | 'replay' | 'recorded';
+/** Static GitHub Pages build: no backend exists, everything is driven by the recorded run. */
+export const REPLAY_ONLY = import.meta.env.VITE_REPLAY_ONLY === '1';
+export const NEEDS_LIVE = 'Live in `make demo`: this needs the running backend, which the static site does not have.';
 export interface Totals { cost: Record<string, number>; costTool: Record<string, number>; callsTool: Record<string, number>; tasks: Record<string, number>; first: number | null; last: number | null }
 export interface DrillRun { name: string; ab: boolean; phase: 'ungoverned' | 'governed' | 'done' | 'error'; starts: { ungoverned?: number; governed?: number }; results: DrillResult[]; error?: string }
 export interface S {
@@ -99,10 +104,13 @@ async function loadAgents(urls: string[]) {
 }
 
 /** Switch between the live dashboard (or fixture) and the static replay. */
+let gen = 0;
 export async function start(mode: 'live' | 'replay') {
-  teardown();
+  teardown(); const my = ++gen;
   set(initial(mode === 'replay' ? 'replay' : FIXTURE ? 'fixture' : 'live'));
   if (mode === 'replay') return startReplay();
+  if (!FIXTURE && (REPLAY_ONLY || !(await getJSON('/v1/agents')))) return my === gen ? startRecorded() : undefined;
+  if (my !== gen) return; // no backend: recorded data only
   void refreshImpact(); void loadAgents(['/v1/agents']);
   if (FIXTURE) { fixtureBaseline(Date.now()).forEach(ingest); set({ connected: true }); stopSim = startFixtureSim(ingest, () => state.actions, () => state.fleet); return; }
   void getJSON('/v1/incidents').then((l) => Array.isArray(l) && l.forEach((data: IncidentEvent) => ingest({ type: 'incident', data })));
@@ -111,6 +119,54 @@ export async function start(mode: 'live' | 'replay') {
   es.onerror = () => set({ connected: false });
   es.onmessage = (e) => { try { ingest(JSON.parse(e.data)); } catch { /* ignore malformed frame */ } };
   timers.push(setInterval(refreshImpact, 30000) as unknown as ReturnType<typeof setTimeout>);
+}
+
+
+// ---------- recorded mode (static site): the recording, looped at real speed, stands in for the live stream ----------
+let rec: { at: number; m: StreamMessage }[] = [];
+let recT0 = 0, recSpan = 0;
+const shiftMsg = (m: StreamMessage, d: number, tag: string): StreamMessage => {
+  const c: any = JSON.parse(JSON.stringify(m));
+  if (typeof c.ts === 'number') c.ts += d;
+  if (c.data && typeof c.data.ts === 'number') c.data.ts += d;
+  if (m.type === 'incident') c.data.incidentId = `${c.data.incidentId}-${tag}`;
+  return c;
+};
+function playRec(shift: number, tag: string) { for (const { at, m } of rec) timers.push(setTimeout(() => ingest(shiftMsg(m, shift, tag)), Math.max(0, at + shift - Date.now()))); }
+function loopRec(n: number) { playRec(Date.now() - recT0, `L${n}`); timers.push(setTimeout(() => loopRec(n + 1), recSpan + 1500)); }
+async function startRecorded() {
+  set({ source: 'recorded' });
+  const b = import.meta.env.BASE_URL;
+  const [ev, imp, ag] = await Promise.all([getJSON(`${b}replay/events.json`), getJSON(`${b}replay/impact.json`), getJSON(`${b}replay/agents.json`)]);
+  set({ impact: imp ?? null, impactErr: !imp, agents: Array.isArray(ag) ? ag : [], updatedAt: Date.now() });
+  if (!Array.isArray(ev) || !ev.length) return;
+  let last = 0;
+  rec = (ev as StreamMessage[]).map((m) => ({ at: (last = msgTs(m) ?? last), m })).sort((a, c) => a.at - c.at);
+  recT0 = rec[0].at; recSpan = rec[rec.length - 1].at - recT0;
+  rec = rec.map((x) => ({ ...x, at: x.at - recT0 })); // offsets from the start of the recording
+  set({ connected: true });
+  loopRec(0);
+}
+/** The runaway-loop drill, replayed from the recording. Stages, spend, calls and receipt ids are read from it; nothing is simulated. */
+async function runRecordedDrill(name: string) {
+  const run: DrillRun = { name, ab: false, phase: 'governed', starts: {}, results: [] };
+  const d = state.impact?.drill;
+  if (name !== 'runaway-loop' || !d || !rec.length) { set({ drillRun: { ...run, phase: 'error', error: name === 'runaway-loop' ? 'The recording did not load.' : `The recording holds only the runaway-loop drill. ${NEEDS_LIVE}` } }); return; }
+  timers.forEach(clearTimeout); timers = [];
+  set({ incidents: [], actions: [], drillRun: run });
+  const t = Date.now(), shift = t - recT0, t0 = d.warmupMs as number, win = d.windowMs as number;
+  run.starts.governed = t; set({ drillRun: { ...run } });
+  playRec(shift, `D${t}`);
+  const stages: DrillResult['stages'] = {};
+  let spend = 0, calls = 0;
+  for (const { at, m } of rec) {
+    if (m.type === 'incident' && m.data.agentId === d.agentId && at >= t0 - 2000 && !(m.data.stage in stages)) stages[m.data.stage] = at - t0;
+    if (m.type === 'action' && m.data.governed && m.data.agentId === d.agentId && at >= t0 && at <= t0 + win) { spend += m.data.costUsd; calls++; }
+  }
+  const res: DrillResult = { drill: name, mode: 'governed', agentId: d.agentId, startedAt: t0 + shift + recT0, durationMs: win, spendUsd: spend, calls, stages, timeToContainMs: stages.proof ?? null, detected: 'detected' in stages, hardContained: 'killed' in stages || 'throttled' in stages };
+  await sleep(Math.max(t0 + win, recSpan) + 400);
+  run.results = [res]; run.phase = 'done'; set({ drillRun: { ...run } });
+  timers.push(setTimeout(() => loopRec(0), 8000));
 }
 
 // ---------- replay ----------
@@ -171,6 +227,7 @@ function playAbs(msgs: StreamMessage[]) {
 }
 
 export async function runDrill(name: string, ab: boolean) {
+  if (state.source === 'recorded') return runRecordedDrill(name);
   const modes = ab ? (['ungoverned', 'governed'] as const) : (['governed'] as const);
   const run: DrillRun = { name, ab, phase: modes[0], starts: {}, results: [] };
   set({ drillRun: run });
@@ -190,6 +247,7 @@ export async function runDrill(name: string, ab: boolean) {
 
 export async function resetDrills() {
   let note: string | undefined;
+  if (state.source === 'recorded') { timers.forEach(clearTimeout); timers = []; set({ drillRun: null, incidents: [], actions: [] }); loopRec(0); return; }
   if (!FIXTURE) { try { await postJSON('/v1/reset'); } catch (e) { note = `The server did not confirm a reset (${(e as Error).message}).`; } }
   timers.forEach(clearTimeout); timers = [];
   set({ drillRun: note ? { name: '', ab: false, phase: 'error', starts: {}, results: [], error: note } : null, incidents: [], actions: state.actions.filter((a) => !a.agentId.startsWith('__')) });
@@ -198,6 +256,13 @@ export async function resetDrills() {
 
 /** POST /v1/agents/:id/promote. 200 (allowed) and 409 (blocked) both carry the PromotionResult; dryRun only evaluates the gates. */
 export async function promoteAgent(id: string, to: LifecycleState, dryRun: boolean): Promise<PromotionResult> {
+  if (state.source === 'recorded') {
+    const rec = state.agents.find((x) => x.id === id); if (!rec) throw new Error(`no agent '${id}'`);
+    const d = state.impact?.drill, ct = d?.timeToContainMs;
+    const acts = rec_actions(id);
+    const res = evaluatePromotion(rec, { to, now: Date.now(), drills: d ? { uncontained: ct.uncontained, containP95Ms: ct.p95, containBudgetMs: d.budgetsMs.containP95 } : null, attackSuite: state.impact?.detector ? { positives: state.impact.detector.tp + state.impact.detector.fn, missed: state.impact.detector.fn } : null, canary: null, budget: { calls: acts.length, errors: acts.filter((a) => a.verdict !== 'allow').length } });
+    return { ...res, dryRun: true, reason: `${res.reason} (Read-only demo: nothing was changed. No canary is on file in the recording.)` };
+  }
   if (FIXTURE) {
     await sleep(350);
     const rec = state.agents.find((x) => x.id === id); if (!rec) throw new Error(`no agent '${id}'`);
@@ -212,7 +277,13 @@ export async function promoteAgent(id: string, to: LifecycleState, dryRun: boole
   return j as PromotionResult;
 }
 
+const rec_actions = (id: string) => rec.flatMap(({ m }) => (m.type === 'action' && m.data.governed && m.data.agentId === id ? [m.data] : []));
 export async function killAgent(id: string): Promise<IncidentEvent> {
+  if (state.source === 'recorded') {
+    const p = rec.map((x) => x.m).find((m) => m.type === 'incident' && m.data.agentId === id && m.data.stage === 'proof');
+    if (!p || p.type !== 'incident') throw new Error(`The recording only holds a kill of invoice-recon, none for '${id}'. ${NEEDS_LIVE}`);
+    return { ...p.data, message: `Replayed from the recorded run, not a new kill. ${p.data.message}` };
+  }
   if (FIXTURE) {
     const t = Date.now();
     const tool = state.agents.find((x) => x.id === id)?.scopes.tools.find((x) => x !== 'agent.call') ?? 'ledger.read';
@@ -236,6 +307,7 @@ export async function killAgent(id: string): Promise<IncidentEvent> {
 const FX_EXTRA: Record<string, { lifecycleState: string; evaluation: null }> = {};
 /** Mirrors services/control/src/admission.ts so the fixture playground behaves like the real gate. */
 export async function reviewAdmission(workload: { name: string; namespace: string; labels: Record<string, string> }): Promise<AdmissionResult> {
+  if (state.source === 'recorded') { const r = admit(workload, state.agents); ingest({ type: 'admission', data: { ...r, workload: workload.name, ts: Date.now() } } as StreamMessage); return r; } // the real gate function, in the browser
   if (FIXTURE) {
     await sleep(350);
     const id = workload.labels['rollcall.dev/agent-id'];
@@ -250,7 +322,9 @@ export async function reviewAdmission(workload: { name: string; namespace: strin
 }
 
 /** POST /v1/agents applies the same validation as admission; used by the "production without evaluation" preset. */
-export async function registerDraft(rec: Partial<AgentRecord> & { id: string }): Promise<AdmissionResult> {
+export async function registerDraft(r0: Partial<AgentRecord> & { id: string }): Promise<AdmissionResult> {
+  const rec = r0;
+  if (state.source === 'recorded') return checkRecord(rec as AgentRecord);
   if (FIXTURE) { await sleep(350); return { allowed: false, code: 'NO_PASSING_EVAL', reason: `Agent '${rec.id}' is in ${rec.lifecycleState} but has no passing evaluation on record. Attach passing evidence or move it back to shadow. (FIXTURE answer)` }; }
   try {
     const r = await fetch('/v1/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rec) });
@@ -261,6 +335,7 @@ export async function registerDraft(rec: Partial<AgentRecord> & { id: string }):
 }
 
 export async function verifyReceipts(): Promise<{ gateway: string; ok: boolean; count?: number; reason?: string }[]> {
+  if (state.source === 'recorded') throw new Error(NEEDS_LIVE.replace('this needs', 'chain verification needs'));
   if (FIXTURE) { await sleep(450); const v = verifyFixtureChain(); return [{ gateway: 'gw-1 (FIXTURE chain, in-browser)', ok: v.ok, count: v.count }]; }
   const j = await getJSON('/v1/receipts/verify');
   if (!j) throw new Error('Could not reach /v1/receipts/verify');

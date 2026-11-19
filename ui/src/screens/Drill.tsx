@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { animate, motion, useReducedMotion } from 'motion/react';
 import { Check, CircleDashed, Flame, PackageCheck, PackageX, Play, RotateCcw, Rewind, Repeat2, ShieldQuestion } from 'lucide-react';
 import type { ActionEvent, DrillResult, IncidentStage } from '../../../contracts/types';
-import { FIXTURE, resetDrills, runDrill, useStore, type DrillRun } from '../store';
+import { FIXTURE, NEEDS_LIVE, resetDrills, runDrill, useStore, type DrillRun } from '../store';
 import { FixtureChip, Measured, StateMark, groupIncidents, ownerShort, secs, useNow, usd, type AgentState } from '../ui';
 import { KillUnconfirmed, Panel, ProofCard } from '../components';
 import { RollRing } from '../ring';
@@ -67,7 +67,11 @@ export function Drill() {
   const state = useStore((s) => s.fleet?.states);
   const reduce = useReducedMotion();
   const [pick, setPick] = useState<(typeof DRILLS)[number]['name']>('runaway-loop');
-  const d = DRILLS.find((x) => x.name === pick)!;
+  const recorded = useStore((s) => s.source === 'recorded');
+  const dr = useStore((s) => s.impact?.drill);
+  const d0 = DRILLS.find((x) => x.name === pick)!;
+  const d = useMemo(() => (recorded ? { ...d0, ab: false } : d0) as typeof d0, [recorded, d0]);
+  const unavailable = recorded && d.name !== 'runaway-loop';
   const active = run && run.name === d.name ? run : null;
   const running = !!active && active.phase !== 'done' && active.phase !== 'error';
   const [ph, setPh] = useState<number | null>(null);
@@ -115,11 +119,12 @@ export function Drill() {
           </button>
         ))}
         <div className="drill-go">
-          <button className="btn btn--primary btn--lg" onClick={start} disabled={running} data-tour="run-drill"><Play size={16} aria-hidden />{running ? `Running ${active?.phase === 'ungoverned' ? 'without controls' : 'with controls'}` : `Run ${d.label.toLowerCase()}`}</button>
+          <button className="btn btn--primary btn--lg" onClick={start} disabled={running || unavailable} data-tour="run-drill"><Play size={16} aria-hidden />{running ? `Running ${active?.phase === 'ungoverned' ? 'without controls' : 'with controls'}` : `Run ${d.label.toLowerCase()}`}</button>
           <button className="btn" onClick={() => { void resetDrills(); setPh(null); }} disabled={running}><RotateCcw size={14} aria-hidden />Reset fleet</button>
         </div>
       </div>
       {active?.phase === 'error' && <p className="note-bad" role="alert">The drill did not finish: {active.error}</p>}
+      {recorded && <p className="rec-note" role="note"><strong>Replayed from the recorded run.</strong> {unavailable ? NEEDS_LIVE : <>Press run to play the recorded governed runaway drill: the stages, spend, calls and receipt ids below are read from the recording. {dr?.spendProtectedUsd && <>The ungoverned side is not replayed here; over the recorded {dr.runs} runs the agent spent a mean of <span className="measured">{usd(dr.spendProtectedUsd.ungovernedMean)}</span> without controls and <span className="measured">{usd(dr.spendProtectedUsd.governedMean)}</span> with them.</>}</>}</p>}
       {!active && <p className="muted">Pick a drill and run it. The real drill warms the fleet for a few seconds, injects the fault, then holds a fixed window.</p>}
 
       {d.release ? <ReleaseView name={d.name as 'bad-release' | 'good-release'} run={run} /> : <>
