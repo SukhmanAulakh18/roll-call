@@ -164,7 +164,7 @@ export async function runDrill(name: string, ab: boolean) {
 
 export async function resetDrills() {
   let note: string | undefined;
-  if (!FIXTURE) { try { await postJSON('/v1/drills/reset'); } catch (e) { note = `The server did not confirm a reset (${(e as Error).message}).`; } }
+  if (!FIXTURE) { try { await postJSON('/v1/reset'); } catch (e) { note = `The server did not confirm a reset (${(e as Error).message}).`; } }
   timers.forEach(clearTimeout); timers = [];
   set({ drillRun: note ? { name: '', ab: false, phase: 'error', starts: {}, results: [], error: note } : null, incidents: [], actions: state.actions.filter((a) => !a.agentId.startsWith('__')) });
   if (FIXTURE) ingest({ type: 'fleet', data: (fixtureBaseline(Date.now())[0] as { type: 'fleet'; data: FleetSummary }).data });
