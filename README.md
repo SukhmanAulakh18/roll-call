@@ -9,6 +9,12 @@ Roll Call is a control room for a fleet of AI agents, with real governance contr
 
 The agents, tools and model responses are simulated. The controls are not. The gateway, registry, admission, budgets, detector, kill path and receipts are the code that a fault actually hits.
 
+## Watch it (66 s)
+
+[![Roll Call demo: a runaway agent is detected, throttled, paged, killed and proven stopped](docs/media/roll-call-poster.png)](https://sukhmanaulakh18.github.io/roll-call/video.html)
+
+Recorded from a real run with `make video`. [Play the video](https://sukhmanaulakh18.github.io/roll-call/video.html) · [interactive replay](https://sukhmanaulakh18.github.io/roll-call/#/replay) · [mp4](docs/media/roll-call-demo.mp4)
+
 ## Positioning
 
 Roll Call builds on open-source work rather than replacing it:
