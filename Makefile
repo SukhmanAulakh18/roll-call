@@ -1,6 +1,6 @@
 # Roll Call — every claim has a target. Offline by default.
 NODE ?= node
-.PHONY: help test acceptance typecheck demo stack drill bench chaos exec-pack verify ui replay compose-up compose-down kind-up admission-demo clean
+.PHONY: help test acceptance typecheck demo stack drill bench chaos exec-pack verify ui replay compose-up compose-down kind-up admission-demo clean print
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*##' Makefile | sed 's/:.*##/ —/'
@@ -43,3 +43,6 @@ replay: ## build static Replay page from the last recorded run
 	$(NODE) scripts/replay.ts
 clean:
 	rm -rf data ui/dist
+print: ## A5 leave-behind PDF/PNG and print/pitch-numbers.md, all from impact.json
+	$(NODE) print/build.ts
+	NODE_PATH=$$(npm root -g) $(NODE) print/render.ts
