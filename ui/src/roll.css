@@ -188,3 +188,5 @@ h2 { font-size: 1.45rem; letter-spacing: 0.01em; font-weight: 700; } h3 { font-s
 .is-zoomed .sweep, .is-zoomed .ring-inner, .is-zoomed .ring-outer, .is-zoomed .ring-track, .is-zoomed .tick { display: none; }
 .roll--compact { max-height: 420px; }
 .theatre-ringbox { overflow: hidden; border-radius: 12px; }
+/* keep the top bar on one row on laptop/projector widths; nav scrolls if it must */
+@media (min-width: 901px) { .topbar-in { flex-wrap: nowrap; } .nav a { padding: 0 var(--space-xs); } .topbar-r { flex-wrap: nowrap; } }

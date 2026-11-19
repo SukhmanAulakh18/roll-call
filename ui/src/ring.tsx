@@ -91,7 +91,7 @@ export function RollRing({ selected, onSelect, focus = null, compact = false }: 
               <button key={r.a.id} ref={(el) => { btns.current[r.i] = el; }} type="button" tabIndex={r.i === tabIdx ? 0 : -1}
                 className={`st st-${r.look} st-side-${p.side} ${on ? 'is-on' : ''} ${focus === r.a.id ? 'is-focus' : ''}`}
                 style={{ left: `${(p.x / VW) * 100}%`, top: `${(p.y / VH) * 100}%`, ['--delay' as string]: `${((r.i / Math.max(n, 1)) * SWEEP_S).toFixed(2)}s`, ['--period' as string]: `${SWEEP_S}s` }}
-                aria-label={`${r.a.name}, ${LOOK_LABEL[r.look]}${r.proof ? ', proof of stop on file' : ''}. Open record.`} aria-current={on ? 'true' : undefined}
+                aria-label={`${[r.a.name, r.look !== 'live' ? LOOK_LABEL[r.look] : '', r.proof ? 'Proof' : ''].filter(Boolean).join(' ')}. ${r.look === 'live' ? `${LOOK_LABEL[r.look]}. ` : ''}${r.proof ? 'Proof of stop on file. ' : ''}Open record.`} aria-current={on ? 'true' : undefined}
                 onClick={() => { setTab(r.i); onSelect(r.a.id); }} onKeyDown={(e) => move(e, r.i)}
                 onFocus={() => { setTab(r.i); setPeek(r.a.id); }} onBlur={() => setPeek(null)} onPointerEnter={() => setPeek(r.a.id)} onPointerLeave={() => setPeek(null)}>
                 <span className="st-node" aria-hidden="true"><i className="st-ping" />
