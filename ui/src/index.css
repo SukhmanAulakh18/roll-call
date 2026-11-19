@@ -1,13 +1,15 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: Console (by request) · redesign: full
- * nav: top bar with route tabs, lens switcher and command palette · signature: the live fleet map, agents as rings on a roll with particles on the calls · states: loading, empty, error, full, fixture · console: graphite (dark) and paper (light)
- * axes: dark/grotesk-sans/chromatic-amber · posture: restrained · contrast: pass · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S3 R4 V3 · weakest: S, particles and rings are the only motion and stop under reduced motion */
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Night Roll (custom) · redesign: full, v3
+ * nav: top bar with route tabs, lens switcher and command palette · signature: the roll, 12 agents on a ring that a slow sweep asks to answer, zooming to the faulty station in a drill · states: loading, empty, error, full, fixture, reduced motion
+ * axes: dark+light/condensed-display+grotesk+wide-mono/signal-teal+one-alarm-coral · posture: calm control room, only incidents move fast · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: V, Topology (React Flow) keeps the earlier node layout under the new tokens */
+/* Hallmark · waive 37 · tokens.css --font-display, --font-body, --font-outlier · three named families (condensed display, grotesk body, mono for numerals); the fourth hit is the generic sans-serif/monospace fallback */
 /* Hallmark · waive 24b · .scrub input::-webkit-slider-thumb margin-top -7px · optical centring of a 22px thumb on an 8px track, not a spacing choice */
 /* Note: the footer string with middle dots is the owner's required wording, set verbatim in App.tsx. */
-@import "@fontsource-variable/host-grotesk/wght.css";
-@import "@fontsource/atkinson-hyperlegible-mono/400.css";
-@import "@fontsource/atkinson-hyperlegible-mono/500.css";
+@import "@fontsource-variable/big-shoulders-display/wght";
+@import "@fontsource-variable/instrument-sans/wght";
+@import "@fontsource-variable/martian-mono/wght";
 @import "@xyflow/react/dist/base.css";
 @import "./tokens.css";
 @import "./base.css" layer(base);
 @import "./app.css";
+@import "./roll.css";
