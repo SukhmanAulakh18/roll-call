@@ -94,3 +94,15 @@ test('detector ignores ungoverned events (the baseline run has no governance)', 
   for (let t = 6000; t < 8000; t += 25) d.observe(ev('a', 1_000_000 + t, { argsHash: 'same', governed: false }));
   assert.equal(d.evaluate(1_000_000 + 8000).length, 0);
 });
+
+test('control serves /replay/events.json as JSON, not the SPA index.html', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  const { startControl } = await import('./app.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'rc-replay-')); writeFileSync(join(dir, 'index.html'), '<html>spa</html>'); writeFileSync(join(dir, 'e.json'), '[{"type":"fleet"}]');
+  const c = await startControl({ dataDir: dir, uiDir: dir, replayFile: join(dir, 'e.json'), tickMs: 0 });
+  try {
+    const r = await fetch(`${c.url}/replay/events.json`);
+    assert.match(r.headers.get('content-type') ?? '', /json/); assert.deepEqual(await r.json(), [{ type: 'fleet' }]);
+  } finally { await c.close(); }
+});

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: './', // relative assets so the same build works at / and under a GitHub Pages sub-path
   plugins: [react()],
   server: { proxy: { '/v1': 'http://localhost:7100', '/replay': 'http://localhost:7100' } },
   build: {

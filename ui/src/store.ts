@@ -113,14 +113,14 @@ export async function start(mode: 'live' | 'replay') {
 let items: { at: number; m: StreamMessage }[] = [];
 let idx = 0, vt = 0;
 async function startReplay() {
-  let ev = await getJSON('/replay/events.json');
+  let ev = await getJSON(`${import.meta.env.BASE_URL}replay/events.json`);
   if (!Array.isArray(ev) || !ev.length) ev = FIXTURE ? (() => { const t = Date.now(); return [...fixtureBaseline(t), ...fixtureDrill('runaway-loop', 'governed', t + 1000).msgs]; })() : [];
   if (!ev.length) return set({ replay: { ...state.replay, status: 'empty' } });
   let last = 0;
   items = (ev as StreamMessage[]).map((m) => ({ at: (last = msgTs(m) ?? last), m })).sort((a, b) => a.at - b.at);
-  const imp = await getJSON('/replay/impact.json');
+  const imp = await getJSON(`${import.meta.env.BASE_URL}replay/impact.json`);
   if (imp) set({ impact: imp }); else if (FIXTURE) void refreshImpact(); else void refreshImpact();
-  await loadAgents(['/replay/agents.json', '/v1/agents']);
+  await loadAgents([`${import.meta.env.BASE_URL}replay/agents.json`, '/v1/agents']);
   if (!state.agents.length) { // derive bare nodes from the recording
     const idsSeen = [...new Set(items.flatMap(({ m }) => (m.type === 'action' || m.type === 'incident' ? [m.data.agentId] : [])))];
     set({ agents: idsSeen.map((id) => ({ id, name: id, purpose: 'Not in the recording', owner: { name: 'unknown', team: 'unknown', escalation: '' }, riskRating: 'low', lifecycleState: 'production', scopes: { tools: [], data: [] }, models: [], residency: 'unknown', evaluation: null } as unknown as AgentRecord)) });

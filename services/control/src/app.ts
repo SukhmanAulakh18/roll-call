@@ -109,6 +109,9 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
   const readJsonFile = (f: string | undefined, what: string): Out => (f && existsSync(f) ? ok(JSON.parse(readFileSync(f, 'utf8'))) : fail(404, `${what} not found; run its make target`));
   r.add('GET', '/v1/impact', () => readJsonFile(opts.impactFile ?? 'impact.json', 'impact.json'));
   r.add('GET', '/v1/replay', () => readJsonFile(opts.replayFile ?? 'replay/events.json', 'replay/events.json'));
+  // Static copies for the UI Replay screen; matched before the SPA fallback so they never come back as index.html.
+  r.add('GET', '/replay/events.json', () => readJsonFile(opts.replayFile ?? 'replay/events.json', 'replay/events.json'));
+  r.add('GET', '/replay/impact.json', () => readJsonFile(opts.impactFile ?? 'impact.json', 'impact.json'));
   r.add('GET', '/v1/receipts/verify', () => {
     const dir = join(opts.dataDir, 'receipts'); const res: Record<string, unknown> = {};
     if (existsSync(dir)) for (const f of readdirSync(dir).filter(f => f.endsWith('.jsonl'))) res[f.replace(/\.jsonl$/, '')] = verifyChain(join(dir, f));
