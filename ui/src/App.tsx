@@ -93,7 +93,7 @@ export function App() {
       </main>
       <footer className="footer">
         <div className="footer-in">
-          <p>Simulated fleet · real controls · every number from the last run ({source === 'fixture' ? 'FIXTURE, no real run' : impact?.generatedAt ? new Date(impact.generatedAt).toLocaleString() : 'no run yet'}) · not affiliated with any bank</p>
+          <p>Simulated fleet · real controls · every number from the last run ({source === 'fixture' ? 'FIXTURE, no real run' : impact?.generatedAt ? new Date(impact.generatedAt).toLocaleString() : 'no run yet'}) · not affiliated with any company</p>
           <p className="footer-r"><span className={`chip ${connected || source !== 'live' ? 'chip--cool' : ''}`} role="status">{status}</span><span className="measured">Updated {updatedAt ? new Date(updatedAt).toLocaleTimeString([], { hour12: false }) : 'never'}</span></p>
         </div>
       </footer>

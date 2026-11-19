@@ -108,7 +108,7 @@ Start with `docs/architecture.md`, then `docs/adr/README.md`.
 
 ## Honest limits
 
-- **The fleet is simulated.** Agents are scripted, tools are mock bank services and model responses are recorded. Results show how the controls behave against these faults. They do not show how real agents would behave.
+- **The fleet is simulated.** Agents are scripted, tools are mock business services and model responses are recorded. Results show how the controls behave against these faults. They do not show how real agents would behave.
 - **Drills are synthetic.** The faults are injected by our own runner, so detection rates describe those faults only. Precision and recall are measured on labelled drills, not on production traffic.
 - **Laptop scale.** Runs are on one machine. Latency, throughput and availability figures are only comparable on the same kind of hardware.
 - **Prices and hours saved are assumptions.** Per-call prices in the policy bundle are editable assumptions. Any savings or hours-saved figure is a model, not a measurement.

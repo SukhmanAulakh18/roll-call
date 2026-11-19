@@ -29,7 +29,7 @@ function Burn({ label, used, target, measured, unit, cmd, verify }: { label: str
 const NODES: { id: string; plane: 'control' | 'data' | 'edge'; x: number; y: number; w: number; label: string; text: string }[] = [
   { id: 'agents', plane: 'edge', x: 14, y: 150, w: 120, label: 'Agent fleet', text: 'Simulated agents. Every action goes through a gateway. They hold short-lived identities and no standing credentials.' },
   { id: 'gw', plane: 'data', x: 230, y: 56, w: 250, label: 'Gateway replicas', text: 'Decides each call: identity, revoked, scope, budget and throttle, policy, masking, forward, receipt. A stale bundle fails closed for high-risk tools.' },
-  { id: 'tools', plane: 'data', x: 230, y: 214, w: 250, label: 'Tools and models', text: 'Mock bank tools and recorded model responses. Only allowed calls reach them.' },
+  { id: 'tools', plane: 'data', x: 230, y: 214, w: 250, label: 'Tools and models', text: 'Mock business tools and recorded model responses. Only allowed calls reach them.' },
   { id: 'receipts', plane: 'data', x: 230, y: 130, w: 250, label: 'Receipt chain', text: 'Every decision is appended to a hash chain per gateway. Verify recomputes the hashes and names the first bad sequence.' },
   { id: 'registry', plane: 'control', x: 600, y: 36, w: 180, label: 'Registry and admission', text: 'The inventory of agents with owners, scopes and evaluations. Admission refuses anything unregistered.' },
   { id: 'issuer', plane: 'control', x: 600, y: 98, w: 180, label: 'Identity issuer', text: 'Issues short-lived signed identities. Refuses revoked or unregistered agents.' },

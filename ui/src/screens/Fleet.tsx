@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import * as Tabs from '@radix-ui/react-tabs';
 import { motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
-import { Octagon, Pause, Play, Siren, X } from 'lucide-react';
+import { ArrowRight, Octagon, Pause, Play, X } from 'lucide-react';
 import type { ActionEvent } from '../../../contracts/types';
 import { getState, runDrill, useStore, verifyReceipts } from '../store';
 import { setUi, useUi } from '../ui-state';
@@ -14,15 +14,16 @@ import { Suspense, lazy } from 'react';
 const FleetMap = lazy(() => import('./FleetMap').then((m) => ({ default: m.FleetMap })));
 import { computeStats } from '../graph';
 import { RollRing } from '../ring';
+import { DrillBanner, LivePipeline, ReceiptChain, spotlight } from '../live';
 
 // ---------------- hero numbers ----------------
-interface TileProps { q: string; children: React.ReactNode; note?: React.ReactNode; viz?: React.ReactNode; verify: Parameters<typeof VerifyButton>[0]['spec']; extra?: React.ReactNode }
-const Tile = ({ q, children, note, viz, verify, extra }: TileProps) => (
-  <article className="tile">
+interface TileProps { go: [string, string]; q: string; children: React.ReactNode; note?: React.ReactNode; viz?: React.ReactNode; verify: Parameters<typeof VerifyButton>[0]['spec']; extra?: React.ReactNode }
+const Tile = ({ go, q, children, note, viz, verify, extra }: TileProps) => (
+  <article className="tile" onPointerMove={spotlight} onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a') && !getSelection()?.toString()) location.hash = go[0]; }}>
     <h2 className="tile-q">{q}</h2>
     <p className="reading">{children}</p>
     {note && <p className="tile-note">{note}</p>}
-    <div className="tile-foot"><div className="tile-viz">{viz}</div><div className="tile-actions">{extra}<VerifyButton spec={verify} /></div></div>
+    <div className="tile-foot"><div className="tile-viz">{viz}</div><div className="tile-actions">{extra}<VerifyButton spec={verify} /><a className="tile-go" href={go[0]}>{go[1]}<ArrowRight size={14} aria-hidden /></a></div></div>
   </article>
 );
 
@@ -78,45 +79,45 @@ export function Instruments() {
     setBusy(false);
   };
   const exist = (
-    <Tile q="What agents exist?" verify={{ title: 'Agents under control', what: 'Registered agents and how many the control plane sees running. Unregistered running must be zero.', field: 'fleet.registered, fleet.running, fleet.unregisteredRunning (live: fleet stream message)', shown: fleet ? `${fleet.running} of ${fleet.registered}` : 'not measured yet', kind: 'measured', command: 'make stack' }}
+    <Tile go={['#/registry', 'Open registry']} q="What agents exist?" verify={{ title: 'Agents under control', what: 'Registered agents and how many the control plane sees running. Unregistered running must be zero.', field: 'fleet.registered, fleet.running, fleet.unregisteredRunning (live: fleet stream message)', shown: fleet ? `${fleet.running} of ${fleet.registered}` : 'not measured yet', kind: 'measured', command: 'make stack' }}
       viz={<StateStrip />} note={fleet ? <><span className="measured">{fleet.unregisteredRunning}</span> running without a record</> : <NotMeasured cmd="make stack" />}>
       {fleet ? <><CountUp value={fleet.running} format={(n) => Math.round(n).toString()} /><span className="reading-unit"> of {fleet.registered}</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );
   const cost = (
-    <Tile q="What does it cost?" verify={{ title: 'Spend right now', what: 'Sum over agents of the measured spend per minute in the latest fleet message. Protected spend is from the drill runs in impact.json.', field: 'fleet.spendPerMinUsd (live); drill.spendProtectedUsd.protectedTotal', shown: isNum(spendNow) ? `${usd(spendNow, 3)} per minute` : 'not measured yet', kind: 'measured', command: 'make stack' }}
+    <Tile go={['#/money', 'Open spend']} q="What does it cost?" verify={{ title: 'Spend right now', what: 'Sum over agents of the measured spend per minute in the latest fleet message. Protected spend is from the drill runs in impact.json.', field: 'fleet.spendPerMinUsd (live); drill.spendProtectedUsd.protectedTotal', shown: isNum(spendNow) ? `${usd(spendNow, 3)} per minute` : 'not measured yet', kind: 'measured', command: 'make stack' }}
       viz={<Sparkline values={fleetHist.map((h) => h.total)} w={150} h={28} label="Fleet spend per minute, recent trend" />}
       note={isNum(d?.spendProtectedUsd?.protectedTotal) ? <><span className="measured">{usd(d.spendProtectedUsd.protectedTotal)}</span> kept out of runaway drills ({d.runs} runs)</> : <NotMeasured cmd="make drill" />}>
       {isNum(spendNow) ? <><CountUp value={spendNow} format={(n) => usd(n, 3)} /><span className="reading-unit"> per min</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );
   const contain = (
-    <Tile q="Can I stop one, fast?" verify={{ title: 'Time to contain, p95', what: `From the fault starting to the independent probe being refused, p95 over ${d?.runs ?? 'the'} recorded drill runs. It includes a SIMULATED owner acknowledgement of ${isNum(d?.simulatedOwnerAckMs) ? d.simulatedOwnerAckMs : 'about 1000'} ms (no real person is paged). The automatic part, time to hard throttle and page, is shown separately in the note.`, field: 'drill.timeToContainMs.p95', shown: isNum(d?.timeToContainMs?.p95) ? secs(d.timeToContainMs.p95) : 'not measured yet', kind: 'measured', command: d?.command ?? 'make drill' }}
+    <Tile go={['#/drill', 'Run the drill']} q="Can I stop one, fast?" verify={{ title: 'Time to contain, p95', what: `From the fault starting to the independent probe being refused, p95 over ${d?.runs ?? 'the'} recorded drill runs. It includes a SIMULATED owner acknowledgement of ${isNum(d?.simulatedOwnerAckMs) ? d.simulatedOwnerAckMs : 'about 1000'} ms (no real person is paged). The automatic part, time to hard throttle and page, is shown separately in the note.`, field: 'drill.timeToContainMs.p95', shown: isNum(d?.timeToContainMs?.p95) ? secs(d.timeToContainMs.p95) : 'not measured yet', kind: 'measured', command: d?.command ?? 'make drill' }}
       viz={isNum(d?.timeToContainMs?.p95) ? <RangeBar p50={d.timeToContainMs.p50} p95={d.timeToContainMs.p95} max={d.timeToContainMs.max} /> : null}
       note={isNum(d?.timeToContainMs?.p95) ? <>over <span className="measured">{Array.isArray(d.timeToContainMs.samples) ? d.timeToContainMs.samples.length : isNum(d.timeToContainMs.samples) ? d.timeToContainMs.samples : d.runs}</span> drills, until the probe is refused. Includes a simulated owner ack of <span className="measured">{isNum(d.simulatedOwnerAckMs) ? secs(d.simulatedOwnerAckMs) : 'about 1 s'}</span>{isNum(d.stagesP95Ms?.paged) && <>; time to hard throttle and page <span className="measured">{secs(d.stagesP95Ms.paged)}</span></>}</> : <NotMeasured cmd="make drill" />}>
       {isNum(d?.timeToContainMs?.p95) ? <CountUp value={d.timeToContainMs.p95 / 1000} format={(n) => `${n.toFixed(1)} s`} /> : <span className="reading-na">no data</span>}
     </Tile>
   );
   const prove = (
-    <Tile q="Can I prove it?" verify={{ title: 'Receipts this session', what: 'Governed gateway decisions delivered on the stream since this page connected. Verify recomputes every hash chain on the gateways.', field: 'Live stream: action events (governed: true). Chain: GET /v1/receipts/verify', shown: `${governed.length} decisions`, kind: 'measured', command: 'make verify' }}
+    <Tile go={['#/replay', 'See a proof']} q="Can I prove it?" verify={{ title: 'Receipts this session', what: 'Governed gateway decisions delivered on the stream since this page connected. Verify recomputes every hash chain on the gateways.', field: 'Live stream: action events (governed: true). Chain: GET /v1/receipts/verify', shown: `${governed.length} decisions`, kind: 'measured', command: 'make verify' }}
       extra={<button className="btn btn--sm btn--primary" onClick={run} disabled={busy}>{busy ? 'Checking' : 'Verify chain'}</button>}
-      viz={<div className="viz-stack"><Sparkline values={decisionTrace(actions)} w={150} h={28} label="Governed decisions per five seconds, last two minutes" />{chain ? <span className={`chainstate ${chain.ok ? 'is-ok' : 'is-bad'}`} role="status">Chain {chain.text}</span> : <span className="muted nowrap">Chain not verified yet</span>}</div>}
+      viz={<div className="viz-stack"><Sparkline values={decisionTrace(actions)} w={150} h={28} label="Governed decisions per five seconds, last two minutes" /><ReceiptChain max={3} mini />{chain ? <span className={`chainstate ${chain.ok ? 'is-ok' : 'is-bad'}`} role="status">Chain {chain.text}</span> : <span className="muted nowrap">Chain not verified yet</span>}</div>}
       note={<><span className="measured">{blocked}</span> denied or slowed so far</>}>
       <CountUp value={governed.length} format={(n) => Math.round(n).toLocaleString('en-US')} /><span className="reading-unit"> decisions</span>
     </Tile>
   );
   const ops = (
-    <Tile q="Who needs a person now?" verify={{ title: 'Agents not healthy', what: 'Agents whose state in the latest fleet message is alert, throttled or killed.', field: 'fleet.states (live)', shown: isNum(alerts) ? `${alerts}` : 'not measured yet', kind: 'measured', command: 'make stack' }} viz={<StateStrip />} note={fleet ? 'Open an agent on the map to stop it' : <NotMeasured cmd="make stack" />}>
+    <Tile go={['#/drill', 'Open drills']} q="Who needs a person now?" verify={{ title: 'Agents not healthy', what: 'Agents whose state in the latest fleet message is alert, throttled or killed.', field: 'fleet.states (live)', shown: isNum(alerts) ? `${alerts}` : 'not measured yet', kind: 'measured', command: 'make stack' }} viz={<StateStrip />} note={fleet ? 'Open an agent on the map to stop it' : <NotMeasured cmd="make stack" />}>
       {isNum(alerts) ? <><CountUp value={alerts} format={(n) => Math.round(n).toString()} /><span className="reading-unit"> of {fleet?.registered}</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );
   const eng1 = (
-    <Tile q="What does control cost in latency?" verify={{ title: 'Overhead at p99', what: 'Difference of two end-to-end p99s: with controls minus the ungoverned baseline. Measured over loopback, plain HTTP, no TLS, in one process on one machine. Not production latency. The in-process decision-path p99 is a separate, smaller number.', field: 'bench.overheadP99Ms', shown: isNum(b?.overheadP99Ms) ? (b.overheadP99Ms > 0 ? `${b.overheadP99Ms.toFixed(2)} ms` : `within run-to-run noise (${b.overheadP99Ms.toFixed(2)} ms measured)`) : 'not measured yet', kind: 'measured', command: b?.command ?? 'make bench' }} note={isNum(b?.throughputRps) ? <><span className="measured">{Math.round(b.throughputRps)}</span> requests per second (loopback, no TLS, not production latency)</> : <NotMeasured cmd="make bench" />}>
+    <Tile go={['#/engineering', 'Open engineering']} q="What does control cost in latency?" verify={{ title: 'Overhead at p99', what: 'Difference of two end-to-end p99s: with controls minus the ungoverned baseline. Measured over loopback, plain HTTP, no TLS, in one process on one machine. Not production latency. The in-process decision-path p99 is a separate, smaller number.', field: 'bench.overheadP99Ms', shown: isNum(b?.overheadP99Ms) ? (b.overheadP99Ms > 0 ? `${b.overheadP99Ms.toFixed(2)} ms` : `within run-to-run noise (${b.overheadP99Ms.toFixed(2)} ms measured)`) : 'not measured yet', kind: 'measured', command: b?.command ?? 'make bench' }} note={isNum(b?.throughputRps) ? <><span className="measured">{Math.round(b.throughputRps)}</span> requests per second (loopback, no TLS, not production latency)</> : <NotMeasured cmd="make bench" />}>
       {isNum(b?.overheadP99Ms) && b.overheadP99Ms <= 0 ? <><span>within noise</span><span className="reading-unit"> ({b.overheadP99Ms.toFixed(2)} ms measured, end-to-end p99 difference)</span></> : isNum(b?.overheadP99Ms) ? <><CountUp value={b.overheadP99Ms} format={(n) => n.toFixed(1)} /><span className="reading-unit"> ms, end-to-end p99 difference</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );
   const eng2 = (
-    <Tile q="Does the detector cry wolf?" verify={{ title: 'Detector precision and recall', what: `For HARD containment only (hard throttle or kill), over scripted fault and non-fault cases, ${det?.runsPerCase ?? 'n'} runs per case. Soft alerts on negative cases: ${det?.softOnNegatives ? `${det.softOnNegatives.runsWithAlert} of ${det.softOnNegatives.runs} runs` : 'not measured yet'}.`, field: 'detector.precision, detector.recall', shown: det ? `${det.precision} / ${det.recall}` : 'not measured yet', kind: 'measured', command: 'make drill' }} note={det ? <><span className="measured">{det.fp}</span> false alarms, <span className="measured">{det.fn}</span> missed, in <span className="measured">{det.tp + det.fp + det.fn + det.tn}</span> runs ({det.runsPerCase} per case), hard containment only{det.softOnNegatives && <>; soft alerts in <span className="measured">{det.softOnNegatives.runsWithAlert}</span> of <span className="measured">{det.softOnNegatives.runs}</span> healthy runs</>}</> : <NotMeasured cmd="make drill" />}>
+    <Tile go={['#/engineering', 'Open engineering']} q="Does the detector cry wolf?" verify={{ title: 'Detector precision and recall', what: `For HARD containment only (hard throttle or kill), over scripted fault and non-fault cases, ${det?.runsPerCase ?? 'n'} runs per case. Soft alerts on negative cases: ${det?.softOnNegatives ? `${det.softOnNegatives.runsWithAlert} of ${det.softOnNegatives.runs} runs` : 'not measured yet'}.`, field: 'detector.precision, detector.recall', shown: det ? `${det.precision} / ${det.recall}` : 'not measured yet', kind: 'measured', command: 'make drill' }} note={det ? <><span className="measured">{det.fp}</span> false alarms, <span className="measured">{det.fn}</span> missed, in <span className="measured">{det.tp + det.fp + det.fn + det.tn}</span> runs ({det.runsPerCase} per case), hard containment only{det.softOnNegatives && <>; soft alerts in <span className="measured">{det.softOnNegatives.runsWithAlert}</span> of <span className="measured">{det.softOnNegatives.runs}</span> healthy runs</>}</> : <NotMeasured cmd="make drill" />}>
       {det ? <><CountUp value={det.precision} format={(n) => n.toFixed(2)} /><span className="reading-unit"> precision</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );
@@ -263,23 +264,6 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
   );
 }
 
-// ---------------- incident banner ----------------
-function IncidentBanner() {
-  const incidents = useStore((s) => s.incidents);
-  const agents = useStore((s) => s.agents);
-  const newest = useStore((s) => s.actions[s.actions.length - 1]?.ts ?? 0);
-  const g = groupIncidents(incidents)[0];
-  if (!g || g.last.stage === 'resolved' || (newest > 0 && newest - g.last.ts > 120000)) return null;
-  const name = agents.find((a) => a.id === g.agentId)?.name ?? g.agentId;
-  return (
-    <div className="banner" role="status">
-      <Siren size={16} aria-hidden /><strong>{name}</strong><span>{g.last.message}</span>
-      <a className="btn btn--sm" href="#/drill">Open the drill view</a>
-    </div>
-  );
-}
-
-
 // ---------------- business band ----------------
 function BusinessBand() {
   const impact = useStore((s) => s.impact);
@@ -290,7 +274,7 @@ function BusinessBand() {
   const NM = <span className="biz-na">not measured yet</span>;
   return (
     <section className="biz" data-tour="biz" aria-labelledby="biz-h">
-      <h1 id="biz-h" className="biz-h">Banks are going from a few AI pilots to thousands of agents.</h1>
+      <h1 id="biz-h" className="biz-h">Companies are going from a few AI pilots to thousands of agents.</h1>
       <div className="biz-grid">
         <div className="biz-problem">
           <p className="biz-k">The problem: four questions nobody can answer fast</p>
@@ -299,13 +283,13 @@ function BusinessBand() {
         <div className="biz-answer">
           <p className="biz-k">Roll Call answers all four, live</p>
           <ul className="biz-out">
-            <li><span className="biz-n measured">{isNum(kept) ? usd(kept) : NM}</span><span className="biz-l">spend protected{isNum(d?.runs) ? <> over {d.runs} runaway drills</> : null}</span></li>
-            <li><span className="biz-n measured">{isNum(p95) ? secs(p95) : NM}</span><span className="biz-l">time to contain, p95, with a simulated owner ack{isNum(d?.simulatedOwnerAckMs) ? <> of {secs(d.simulatedOwnerAckMs)}</> : null} (no real person is paged)</span></li>
-            <li><span className="biz-n measured">{fleet ? `${fleet.registered} registered, ${fleet.unregisteredRunning} unregistered` : NM}</span><span className="biz-l">agents under control</span></li>
+            <li><span className="biz-n measured">{isNum(kept) ? <CountUp value={kept} format={(n) => usd(n)} /> : NM}</span><span className="biz-l">spend protected{isNum(d?.runs) ? <> over {d.runs} runaway drills</> : null}</span></li>
+            <li><span className="biz-n measured">{isNum(p95) ? <CountUp value={p95} format={(n) => secs(n)} /> : NM}</span><span className="biz-l">time to contain, p95, with a simulated owner ack{isNum(d?.simulatedOwnerAckMs) ? <> of {secs(d.simulatedOwnerAckMs)}</> : null} (no real person is paged)</span></li>
+            <li><span className="biz-n measured">{fleet ? <><CountUp value={fleet.registered} format={(n) => String(Math.round(n))} /> registered, <CountUp value={fleet.unregisteredRunning} format={(n) => String(Math.round(n))} /> unregistered</> : NM}</span><span className="biz-l">agents under control</span></li>
           </ul>
         </div>
       </div>
-      <p className="biz-why"><strong>Why now:</strong> OSFI E-23 (model risk management) takes effect May 1, 2027 and expects a live, owned inventory. This is an engineering interpretation, not compliance advice.</p>
+      <p className="biz-why"><strong>Why now:</strong> regulators are asking for live AI inventories — e.g. OSFI E-23 (Canadian financial institutions) from May 1, 2027. Engineering interpretation, not compliance advice.</p>
     </section>
   );
 }
@@ -314,19 +298,22 @@ function BusinessBand() {
 export function Fleet({ selected }: { selected: string | null }) {
   const [view, setView] = useLocal<'roll' | 'topology'>('view', 'roll');
   const select = (id: string | null) => { location.hash = id ? `#/agent/${encodeURIComponent(id)}` : '#/'; };
-  const goDrill = () => { const r = getState().drillRun; location.hash = '#/drill'; if (!r || r.phase === 'done' || r.phase === 'error') void runDrill('runaway-loop', true); };
+  const running = useStore((s) => !!s.drillRun && s.drillRun.phase !== 'done' && s.drillRun.phase !== 'error');
+  const goDrill = () => { if (running) { location.hash = '#/drill'; return; } void runDrill('runaway-loop', true); };
   const source = useStore((s) => s.source);
   return (
     <div className="fleet">
       <BusinessBand />
+      <DrillBanner />
+      <LivePipeline />
       <section className={`hero ${selected ? 'has-side' : ''}`}>
         <div className="hero-l">
           {selected ? <AgentPanel id={selected} onClose={() => select(null)} /> : (
             <>
               <h2 className="hero-h">Every agent answers the roll.</h2>
-              <p className="hero-p">Roll Call watches a bank's AI agents (software workers) and can stop one that goes wrong, with proof.</p>
+              <p className="hero-p">Roll Call watches a company's AI agents (software workers) and can stop one that goes wrong, with proof.</p>
               <div className="hero-a">
-                <button className="btn btn--primary btn--lg" onClick={goDrill}><Play size={16} aria-hidden />Run a drill</button>
+                <span className="cta"><button className="btn btn--primary btn--lg btn--hero" onClick={goDrill}><Play size={18} aria-hidden />{running ? 'Drill running, open it' : 'Run a drill'}</button></span>
                 <a className="btn btn--lg" href="#/replay">Watch a recorded run</a>
               </div>
               {source === 'fixture' && <p className="hero-n">Fixture mode: the roll below is invented placeholder data.</p>}
@@ -345,7 +332,6 @@ export function Fleet({ selected }: { selected: string | null }) {
         </Panel>
       </section>
       <Instruments />
-      <IncidentBanner />
       <Ticker className="ticker--wide" />
     </div>
   );

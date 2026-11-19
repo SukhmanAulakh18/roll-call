@@ -113,7 +113,7 @@ ol.q .a { font-size:9.5pt; color:var(--muted); line-height:1.35; margin-top:0.6m
 <body>
 <div class="sheet">
   <h1>Roll Call</h1>
-  <p class="one">Watches a bank's AI agents and can stop one that goes wrong, with proof.</p>
+  <p class="one">Watches a company's AI agents and can stop one that goes wrong, with proof.</p>
   <div class="rule"></div>
   <h2>Four questions</h2>
   <ol class="q">
@@ -131,7 +131,7 @@ ${questions.map(([q, a], i) => `    <li><span class="n">${i + 1}</span><div><div
     <div class="qrb">${qrReplay}<div class="c"><b>Replay</b>Offline recording of a run<br><span>${wbr(PAGE)}</span></div></div>
     <div class="qrb">${qrRepo}<div class="c"><b>Source</b>The repository<br><span>${wbr(REPO)}</span></div></div>
   </div>
-  <div class="foot">Simulated fleet · real controls · not affiliated with any bank</div>
+  <div class="foot">Simulated fleet · real controls · not affiliated with any company</div>
 </div>
 </body>
 </html>

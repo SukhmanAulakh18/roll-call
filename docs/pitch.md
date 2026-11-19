@@ -48,13 +48,13 @@ Each opener says what Roll Call shows. None says that the company uses, plans, h
 - **"What would it take to pilot?"** The 30/60/90-day plan, which is a plan and not a measurement:
   - 30 days, read-only discovery. Register what exists, observe calls and spend, enforce nothing. Output: a real inventory and real baselines.
   - 60 days, enforce where it is safe. Admission and budgets on low-risk agents, human approval on high-risk actions. Output: measured block rates and owner feedback.
-  - 90 days, evidence pack and decision. Evidence mapped to the bank's own inventory fields, then a decision to expand or stop, using the pilot's numbers and not these.
+  - 90 days, evidence pack and decision. Evidence mapped to the company's own inventory fields, then a decision to expand or stop, using the pilot's numbers and not these.
 - **"What fails?"** "Start with the FMEA in `docs/FMEA.md`. For static stability: when control is down, low-risk work keeps running on the cached policy. High-risk calls are refused once that policy is stale. Nobody can kill an agent during that outage. The chaos results are in the `chaos` section of impact.json, and we say that openly." Then give the limits below if asked.
 
 ## Never say
 
-- That a bank, a company or a regulator uses, plans, has approved or endorses Roll Call, or is a customer.
-- That the data is real or comes from any bank, that customers are involved, or that anything runs in production.
+- That a company or a regulator uses, plans, has approved or endorses Roll Call, or is a customer.
+- That the data is real or comes from any company, that customers are involved, or that anything runs in production.
 - That the overhead figure is decision latency or production latency. It is an end-to-end difference of two p99s.
 - "Time to contain" without "including a simulated owner acknowledgement".
 - "Zero false alarms", "100 per cent", or "perfect detection" without the hard-containment qualifier and the run count.
@@ -84,7 +84,7 @@ These come from `exec-pack/exec-review.md`. Say the first two before anyone asks
 10. Receipts have no external anchor yet, so tail truncation is not detected (ADR-008).
 11. While the control plane is down, nobody can kill an agent or push a revocation, and the detector is blind.
 12. The service does not yet refuse to start without `ROLLCALL_SECRET` outside demo mode.
-13. The E-23 page is an engineering interpretation. The mapping to the bank's own inventory fields has not been done. It is not legal, regulatory or compliance advice.
+13. The E-23 page is an engineering interpretation. The mapping to the company's own inventory fields has not been done. It is not legal, regulatory or compliance advice.
 14. Licences for the open-source components are not verified (README licence table is TBD).
 15. Not affiliated with or endorsed by any company or regulator named.
 16. The release drill injects one simulated fault kind (failing requests) into one agent. Latency and scope regressions are gated but not drilled (ADR-014).

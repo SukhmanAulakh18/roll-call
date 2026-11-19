@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Check, Pause, TriangleAlert, X } from 'lucide-react';
 import { useStore } from './store';
-import { Sparkline, groupIncidents, usd, useNow, type AgentState } from './ui';
+import { Sparkline, groupIncidents, ownerShort, usd, useNow, type AgentState } from './ui';
 
 /** Heartbeat older than this means the agent did not answer the last sweep. */
 const FRESH_MS = 15000;
@@ -91,14 +91,14 @@ export function RollRing({ selected, onSelect, focus = null, compact = false }: 
               <button key={r.a.id} ref={(el) => { btns.current[r.i] = el; }} type="button" tabIndex={r.i === tabIdx ? 0 : -1}
                 className={`st st-${r.look} st-side-${p.side} ${on ? 'is-on' : ''} ${focus === r.a.id ? 'is-focus' : ''}`}
                 style={{ left: `${(p.x / VW) * 100}%`, top: `${(p.y / VH) * 100}%`, ['--delay' as string]: `${((r.i / Math.max(n, 1)) * SWEEP_S).toFixed(2)}s`, ['--period' as string]: `${SWEEP_S}s` }}
-                aria-label={`${[r.a.name, r.look !== 'live' ? LOOK_LABEL[r.look] : '', r.proof ? 'Proof' : ''].filter(Boolean).join(' ')}. ${r.look === 'live' ? `${LOOK_LABEL[r.look]}. ` : ''}${r.proof ? 'Proof of stop on file. ' : ''}Open record.`} aria-current={on ? 'true' : undefined}
+                aria-label={`${[r.a.name, r.look !== 'live' ? LOOK_LABEL[r.look] : '', r.proof ? 'Proof' : ''].filter(Boolean).join(' ')} ${r.look === 'live' ? 'Answered. ' : ''}${r.proof ? 'Proof of stop on file. ' : ''}Open record.`} aria-current={on ? 'true' : undefined}
                 onClick={() => { setTab(r.i); onSelect(r.a.id); }} onKeyDown={(e) => move(e, r.i)}
                 onFocus={() => { setTab(r.i); setPeek(r.a.id); }} onBlur={() => setPeek(null)} onPointerEnter={() => setPeek(r.a.id)} onPointerLeave={() => setPeek(null)}>
                 <span className="st-node" aria-hidden="true"><i className="st-ping" />
                   {r.look === 'live' ? <Check size={20} strokeWidth={2.8} /> : r.look === 'alert' ? <TriangleAlert size={20} strokeWidth={2.4} /> : r.look === 'throttled' ? <Pause size={18} strokeWidth={2.6} /> : r.look === 'killed' ? <X size={20} strokeWidth={2.6} /> : <span className="st-dot" />}
                 </span>
-                <span className={`st-label ${compact && !on && focus !== r.a.id ? 'st-label--off' : ''}`} aria-hidden="true"><span className="st-name">{r.a.name}</span>{r.look !== 'live' && <span className="st-sub">{LOOK_LABEL[r.look]}</span>}</span>
-                {r.proof && <span className="st-stamp" aria-hidden="true">Proof</span>}
+                <span className={`st-label ${compact && !on && focus !== r.a.id ? 'st-label--off' : ''}`} aria-hidden="true"><span className="st-name">{r.a.name}</span>{' '}{r.look !== 'live' && <span className="st-sub">{LOOK_LABEL[r.look]}</span>}</span>
+                {r.proof && ' '}{r.proof && <span className="st-stamp" aria-hidden="true">Proof</span>}
               </button>
             );
           })}
@@ -113,22 +113,21 @@ export function RollRing({ selected, onSelect, focus = null, compact = false }: 
           })}
         </div>
       </div>
+      {sel && !compact && !focus && (() => { const p = pos(sel.i); return (
+        <div className={`st-tip st-tip--${p.side}`} aria-hidden="true" style={{ left: `${(p.x / VW) * 100}%`, top: `${(p.y / VH) * 100}%` }}>
+          <span className="st-tip-k">{LOOK_LABEL[sel.look]}</span>
+          <span className="st-tip-n">{sel.a.name}</span>
+          <span>Owner: {ownerShort(sel.a.owner.name)}, {sel.a.owner.team}</span>
+          <span>Risk: {sel.a.riskRating}</span>
+          <span className="measured">{typeof rates?.[sel.a.id] === 'number' ? `${usd(rates[sel.a.id], 3)} per minute` : 'spend not reported yet'}</span>
+          <Sparkline values={hist[sel.a.id] ?? []} w={200} h={30} tone={sel.look === 'alert' || sel.look === 'throttled' ? 'bad' : sel.look === 'killed' ? 'muted' : 'cool'} label={`${sel.a.name} spend per minute trace`} />
+        </div>); })()}
       <div className="ring-read" aria-hidden="true">
-        {sel ? (
-          <div className="readout readout--agent">
-            <p className="readout-k">{LOOK_LABEL[sel.look]}</p>
-            <p className="readout-name">{sel.a.name}</p>
-            <p className="readout-rate measured">{typeof rates?.[sel.a.id] === 'number' ? `${usd(rates[sel.a.id], 3)} / min` : 'spend not reported yet'}</p>
-            <p className="readout-scopes">{sel.a.scopes.tools.slice(0, 4).map((t) => <span className="tag" key={t}>{t}</span>)}{sel.a.scopes.tools.length > 4 && <span className="tag">+{sel.a.scopes.tools.length - 4}</span>}</p>
-            <Sparkline values={hist[sel.a.id] ?? []} w={200} h={36} tone={sel.look === 'alert' || sel.look === 'throttled' ? 'bad' : sel.look === 'killed' ? 'muted' : 'cool'} label={`${sel.a.name} spend per minute trace`} />
-          </div>
-        ) : (
-          <div className="readout">
-            <p className="readout-big measured">{agents.length ? live : '–'}<span className="readout-of"> / {agents.length || '–'}</span></p>
-            <p className="readout-k">answered the roll</p>
-            <p className="readout-s">{!agents.length ? 'Waiting for the registry' : needs ? `${needs} need a person` : stopped ? `${stopped} stopped, proof on file` : ghosts ? `${ghosts} unregistered, no answer` : 'No gaps in the roll'}</p>
-          </div>
-        )}
+        <div className="readout">
+          <p className="readout-big measured">{agents.length ? live : '–'}<span className="readout-of"> / {agents.length || '–'}</span></p>
+          <p className="readout-k">answered the roll</p>
+          <p className="readout-s">{!agents.length ? 'Waiting for the registry' : needs ? `${needs} need a person` : stopped ? `${stopped} stopped, proof on file` : ghosts ? `${ghosts} unregistered, no answer` : 'No gaps in the roll'}</p>
+        </div>
       </div>
       <p className="visually-hidden" role="status">{summary}</p>
     </div>
