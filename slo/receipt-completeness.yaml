@@ -5,7 +5,7 @@ metadata:
   displayName: Receipt completeness
 spec:
   service: roll-call-gateway
-  description: 'Every governed decision appends a hash-chained receipt: receipts appended / decisions made. The target is 100%; 0.001% only gives the burn-rate maths a budget. Any gap also pages immediately (ReceiptGap).'
+  description: 'Every governed decision appends a hash-chained receipt: receipts appended / decisions made (the latency histogram count, a series that exists from boot). The target is 100%; 0.001% only gives the burn-rate maths a budget. Any gap also pages immediately (ReceiptGap).'
   budgetingMethod: Occurrences
   timeWindow:
     - duration: 30d
@@ -23,4 +23,4 @@ spec:
           metricSource:
             type: Prometheus
             spec:
-              query: 'sum(rate(rollcall_gateway_decisions_total[$window]))'
+              query: 'sum(rate(rollcall_gateway_decision_seconds_count[$window]))'

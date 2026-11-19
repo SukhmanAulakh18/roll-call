@@ -18,4 +18,5 @@ Option 2. Internal events use the Roll Call contract in `contracts/types.ts`. A 
 - One more layer to maintain. It is small and tested by mapping fixtures.
 - The production path is OTel Collector to Prometheus (metrics), Tempo (traces) and Loki (logs), with Grafana on top, plus Langfuse for LLM-specific traces. See `docs/architecture.md`.
 - Re-check the GenAI convention status before each release. If it reaches Stable, the adapter can be simplified.
-- Offline demo: the gateway exposes Prometheus text at `GET /metrics`, which needs no collector.
+- Offline demo: the gateway and control expose Prometheus text at `GET /metrics`, which needs no collector. Prometheus scrape is the primary path (`make observe`).
+- Built: `deploy/observability/otel-collector.yaml` (compose profile `otel`) scrapes the same targets and remote-writes to Prometheus. Verified once, metrics only. Not built: the adapter that maps events to spans and logs, Tempo, Loki, Langfuse.

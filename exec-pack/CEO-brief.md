@@ -1,6 +1,6 @@
 # Roll Call: executive brief
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:30:27.713Z, gitSha f0f7908 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:34:34.489Z, gitSha eebcee1 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
 
 ## The problem: four questions about every AI agent
 
@@ -18,7 +18,7 @@ Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:30
 | Time to contain a runaway agent, p95 (over 20 drills; includes a SIMULATED owner acknowledgement of 1000 ms) | **2227 ms** | `drill.timeToContainMs.p95` |
 | Of which time to hard throttle and page, p95 (automatic, no human) | **752 ms** | `drill.stagesP95Ms.paged` |
 | Spend kept out per runaway drill, mean ($13.21 across all drills) | **$0.66** | `drill.spendProtectedUsd.protectedMean` |
-| Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **0.87 ms** | `bench.overheadP99Ms` |
+| Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency | **-1.11 ms** | `bench.overheadP99Ms` |
 
 **Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In 8 drills with a faulty new version, 8 were rolled back automatically (p95 8578 ms from the first faulty call); 0 good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted error budget (ADR-014).
 

@@ -124,22 +124,22 @@ groups:
     interval: 30s
     rules:
       - record: slo:sli_error:ratio_rate5m
-        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[5m]))) / (sum(rate(rollcall_gateway_decisions_total[5m]))))
+        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[5m]))) / (sum(rate(rollcall_gateway_decision_seconds_count[5m]))))
         labels: { slo: receipt-completeness, service: roll-call-gateway }
       - record: slo:sli_error:ratio_rate30m
-        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[30m]))) / (sum(rate(rollcall_gateway_decisions_total[30m]))))
+        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[30m]))) / (sum(rate(rollcall_gateway_decision_seconds_count[30m]))))
         labels: { slo: receipt-completeness, service: roll-call-gateway }
       - record: slo:sli_error:ratio_rate1h
-        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[1h]))) / (sum(rate(rollcall_gateway_decisions_total[1h]))))
+        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[1h]))) / (sum(rate(rollcall_gateway_decision_seconds_count[1h]))))
         labels: { slo: receipt-completeness, service: roll-call-gateway }
       - record: slo:sli_error:ratio_rate6h
-        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[6h]))) / (sum(rate(rollcall_gateway_decisions_total[6h]))))
+        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[6h]))) / (sum(rate(rollcall_gateway_decision_seconds_count[6h]))))
         labels: { slo: receipt-completeness, service: roll-call-gateway }
       - record: slo:sli_error:ratio_rate3d
-        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[3d]))) / (sum(rate(rollcall_gateway_decisions_total[3d]))))
+        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[3d]))) / (sum(rate(rollcall_gateway_decision_seconds_count[3d]))))
         labels: { slo: receipt-completeness, service: roll-call-gateway }
       - record: slo:sli_error:ratio_rate30d
-        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[30d]))) / (sum(rate(rollcall_gateway_decisions_total[30d]))))
+        expr: 1 - ((sum(rate(rollcall_gateway_receipts_total[30d]))) / (sum(rate(rollcall_gateway_decision_seconds_count[30d]))))
         labels: { slo: receipt-completeness, service: roll-call-gateway }
       - record: slo:burn_rate:5m
         expr: slo:sli_error:ratio_rate5m{slo="receipt-completeness",service="roll-call-gateway"} / 0.00001

@@ -1,5 +1,5 @@
 // make bench: gateway decision-path latency (governed /v1/act) vs ungoverned /v1/direct. Merges the `bench` section into impact.json.
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startStack } from '../sim/stack.ts';
@@ -32,5 +32,6 @@ const bench = {
   note: 'p50/p95/p99 are the gateway-reported decision path in ms (excludes tool time). endToEnd includes client + HTTP + mock tool.',
   governed, direct, overheadP99Ms: governed.endToEnd.p99 - direct.endToEnd.p99, throughputRps: governed.rps, targetDecisionP99Ms: 50,
 };
-mergeImpact({ bench });
+const k6 = existsSync('impact.json') ? JSON.parse(readFileSync('impact.json', 'utf8')).bench?.k6 : undefined; // keep the last `make k6` result
+mergeImpact({ bench: k6 ? { ...bench, k6 } : bench });
 console.log(JSON.stringify(bench, null, 1));

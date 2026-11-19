@@ -40,6 +40,8 @@ services:
     environment:
       <<: *app-env
       PORT: "7100"
+      GATEWAY_URLS: http://gateway-1:7200,http://gateway-2:7200   # kill-with-proof probes these; without it every kill is kill_unconfirmed
+      FLEET_URL: http://fleet:7400
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7100/healthz"]
       interval: 5s

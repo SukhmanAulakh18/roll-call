@@ -1,6 +1,6 @@
 # Cost model
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:30:27.713Z, gitSha f0f7908 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements.
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:34:34.489Z, gitSha eebcee1 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements.
 
 **ASSUMPTION.** Every price below is an illustrative assumption from `contracts/prices.ts`, copied into impact.json `assumptions`. They are not vendor prices. Change the file and re-run `make drill` to change them. Spend figures in the briefs are measured call counts multiplied by these prices.
 

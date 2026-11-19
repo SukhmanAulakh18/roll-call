@@ -6,35 +6,49 @@
     "tool": "ledger.read",
     "note": "p50/p95/p99 are the gateway-reported decision path in ms (excludes tool time). endToEnd includes client + HTTP + mock tool.",
     "governed": {
-      "p50": 0.02570000011473894,
-      "p95": 0.06516799982637167,
-      "p99": 0.09013399994000793,
+      "p50": 0.019241999951191247,
+      "p95": 0.06405899999663234,
+      "p99": 0.10233999998308718,
       "endToEnd": {
-        "p50": 6.05308100000002,
-        "p95": 10.577296000000388,
-        "p99": 14.500298999999359
+        "p50": 5.223026000000118,
+        "p95": 9.803492000000006,
+        "p99": 13.5130079999999
       },
-      "rps": 2279.3549704426696,
+      "rps": 2699.1447848820885,
       "notAllowed": 0
     },
     "direct": {
-      "p50": 0.0030620000325143337,
-      "p95": 0.011947999941185117,
-      "p99": 0.021942000137642026,
+      "p50": 0.0022640000097453594,
+      "p95": 0.011448000092059374,
+      "p99": 0.015226999996230006,
       "endToEnd": {
-        "p50": 5.197514999999839,
-        "p95": 10.144139999999425,
-        "p99": 13.627480000001015
+        "p50": 4.3307770000001256,
+        "p95": 9.347936999999547,
+        "p99": 14.62716300000011
       },
-      "rps": 2585.8442352414963,
+      "rps": 2922.0965011090198,
       "notAllowed": 0
     },
-    "overheadP99Ms": 0.8728189999983442,
-    "throughputRps": 2279.3549704426696,
-    "targetDecisionP99Ms": 50
+    "overheadP99Ms": -1.1141550000002098,
+    "throughputRps": 2699.1447848820885,
+    "targetDecisionP99Ms": 50,
+    "k6": {
+      "command": "RC_TICK_MS=0 make stack; RATE=1000 make k6 (grafana/k6:1.3.0, host network, constant-arrival-rate 1000/s for 60 s)",
+      "endpoint": "POST /v1/act ledger.read, end to end over HTTP (includes the mock tool), incident detection off, fleet simulator running in the same process",
+      "p50Ms": 0.984283,
+      "p95Ms": 8.911345999999986,
+      "p99Ms": 34.60587779000003,
+      "maxMs": 194.181536,
+      "rps": 999.9730185280195,
+      "requests": 60000,
+      "errorRate": 0,
+      "checksPassRate": 1,
+      "targetP99Ms": 50,
+      "targetNote": "threshold p(99)<50 ms on http_req_duration{endpoint:act}; a target, not a result"
+    }
   },
-  "generatedAt": "2026-11-19T15:30:27.713Z",
-  "gitSha": "f0f7908",
+  "generatedAt": "2026-11-19T15:34:34.489Z",
+  "gitSha": "eebcee1",
   "environment": {
     "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
     "cores": 4,

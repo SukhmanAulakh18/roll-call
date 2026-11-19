@@ -13,7 +13,7 @@ groups:
         labels: { severity: page, service: roll-call-control, slo: unregistered-agents }
         annotations: { summary: 'An agent is running that is not in the registry.', runbook: docs/slo.md }
       - alert: ReceiptGap
-        expr: sum(increase(rollcall_gateway_decisions_total[5m])) - sum(increase(rollcall_gateway_receipts_total[5m])) > 0
+        expr: sum(increase(rollcall_gateway_decision_seconds_count[5m])) - sum(increase(rollcall_gateway_receipts_total[5m])) > 0
         for: 5m
         labels: { severity: page, service: roll-call-gateway, slo: receipt-completeness }
         annotations: { summary: 'Decisions were made without a receipt appended.', runbook: docs/slo.md }

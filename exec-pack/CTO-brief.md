@@ -1,6 +1,6 @@
 # Roll Call: technical brief
 
-Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:30:27.713Z, gitSha f0f7908 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
+Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:34:34.489Z, gitSha eebcee1 (chaos section run at 2026-11-19T08:45:37.109Z). generatedAt is the time of the latest merge into impact.json; sections run earlier keep their own measurements. The fleet, tools and model responses are simulated; the controls are real code. Results are from one laptop-class machine (see impact.json environment).
 
 ## Architecture (C4 summary)
 
@@ -23,10 +23,10 @@ Reproduce: `make drill-release`. The production design (Argo Rollouts calling th
 
 | Requirement | Target | Measured | Field |
 |---|---|---|---|
-| Gateway decision path p99 (in-process timer around the decision code only; excludes I/O and TLS) | at most 50 ms | 0.0901 ms | `bench.governed.p99` |
-| End-to-end p99, governed (loopback, no TLS, single process) | not set | 14.50 ms | `bench.governed.endToEnd.p99` |
-| End-to-end p99, ungoverned (same setup) | not set | 13.63 ms | `bench.direct.endToEnd.p99` |
-| Overhead = difference of the two end-to-end p99s above. Not production latency | not set | 0.87 ms | `bench.overheadP99Ms` |
+| Gateway decision path p99 (in-process timer around the decision code only; excludes I/O and TLS) | at most 50 ms | 0.1023 ms | `bench.governed.p99` |
+| End-to-end p99, governed (loopback, no TLS, single process) | not set | 13.51 ms | `bench.governed.endToEnd.p99` |
+| End-to-end p99, ungoverned (same setup) | not set | 14.63 ms | `bench.direct.endToEnd.p99` |
+| Overhead = difference of the two end-to-end p99s above. Not production latency | not set | -1.11 ms | `bench.overheadP99Ms` |
 | Time to detect, p95 | at most 10000 ms | 752 ms | `drill.stagesP95Ms.detected` |
 | Time to contain, p95 (over 20 drills) | at most 30000 ms | 2227 ms | `drill.timeToContainMs.p95` |
 | Time to hard throttle and page, p95 (automatic part) | not set | 752 ms | `drill.stagesP95Ms.paged` |
@@ -58,7 +58,7 @@ The qualitative analysis is [`docs/FMEA.md`](../docs/FMEA.md) (copy: `FMEA.md`).
 
 ## Capacity note
 
-The bench ran 6000 requests at concurrency 16 on a machine with 4 cores, which also ran the load generator, the mock tools and control: 2279 req/s through one gateway. The simulated fleet generates 17 calls/s. This is a laptop-scale measurement, not a capacity plan. Production sizing needs a load test against a deployed gateway (the design names k6) and a decision on the production data plane (agentgateway, ADR-001). After one of two replicas dies, the survivor takes all the traffic; headroom per replica has not been measured.
+The bench ran 6000 requests at concurrency 16 on a machine with 4 cores, which also ran the load generator, the mock tools and control: 2699 req/s through one gateway. The simulated fleet generates 17 calls/s. This is a laptop-scale measurement, not a capacity plan. Production sizing needs a load test against a deployed gateway (the design names k6) and a decision on the production data plane (agentgateway, ADR-001). After one of two replicas dies, the survivor takes all the traffic; headroom per replica has not been measured.
 
 ## Licences of dependencies actually used
 

@@ -47,7 +47,8 @@ slo-test: slo ## promtool check + unit test of the burn-rate alerts (docker)
 	docker run --rm --entrypoint promtool -v $(CURDIR)/deploy/observability/prometheus:/p prom/prometheus:v3.5.0 check rules /p/rules/slo.rules.yml /p/rules/invariants.rules.yml
 	docker run --rm --entrypoint promtool -v $(CURDIR)/deploy/observability/prometheus:/p prom/prometheus:v3.5.0 test rules /p/tests/slo.test.yml
 k6: ## 60 s open-model load on a running `make stack` (docker, host network) -> k6/summary.json
-	docker run --rm --network host -v $(CURDIR)/k6:/k6 grafana/k6:1.3.0 run --summary-export /k6/summary.json /k6/gateway.js
+	docker run --rm --user $(shell id -u) --network host -v $(CURDIR)/k6:/k6 grafana/k6:1.3.0 run --summary-export /k6/summary.json /k6/gateway.js
+	$(NODE) scripts/k6-merge.ts
 kind-up: ## kind cluster + AgentRecord CRD + admission webhook
 	bash deploy/k8s/kind-up.sh
 admission-demo: ## try to run an unregistered agent in kind

@@ -58,6 +58,9 @@ To run the containers instead: `make compose-up`, then `make compose-down` to st
 | `make verify` | Runs `exec-pack` first, then chain verification, tamper test, every verification-matrix command, schema check and forbidden-strings scan |
 | `make replay` | Build a self-contained static Replay bundle in `dist-replay/` (open `#/replay`); `.github/workflows/pages.yml` publishes it to GitHub Pages so a QR code can open it on a phone |
 | `make compose-up` / `make compose-down` | Docker compose stack, up and down |
+| `make observe` | Compose plus Prometheus :9090 and Grafana :3000 (SLO dashboard); see `docs/slo.md` |
+| `make slo-test` | Generate burn-rate rules from `slo/*.yaml`, `promtool check` and unit test |
+| `make k6` | 60 s load test against `RC_TICK_MS=0 make stack`; merges `bench.k6` into impact.json |
 | `make kind-up` | kind cluster with the AgentRecord CRD and admission webhook (planned) |
 | `make admission-demo` | Try to run an unregistered agent in kind (planned) |
 | `make clean` | Remove `data` and `ui/dist` |
