@@ -5,7 +5,7 @@ import type { ActionEvent, DrillResult, IncidentStage } from '../../../contracts
 import { FIXTURE, resetDrills, runDrill, useStore, type DrillRun } from '../store';
 import { FixtureChip, Measured, StateMark, groupIncidents, ownerShort, secs, useNow, usd, type AgentState } from '../ui';
 import { KillUnconfirmed, Panel, ProofCard } from '../components';
-import { FleetMap } from './FleetMap';
+import { RollRing } from '../ring';
 import { ReleaseView } from './ReleaseDrill';
 
 const DRILLS = [
@@ -95,7 +95,10 @@ export function Drill() {
     return c;
   };
   const start = () => { setPh(null); void runDrill(d.name, d.ab); };
-  const canReplay = d.ab && ungovRes && govRes;
+  const canReplay = !!govRes && (!d.ab || !!ungovRes);
+  const stageMs = (st: IncidentStage) => govRes?.stages?.[st] ?? (g?.byStage[st] && t0g != null ? g.byStage[st]!.ts - t0g : undefined);
+  const zoomed = ph != null ? (stageMs('detected') ?? Infinity) / 1000 <= ph : !!g?.byStage.detected && d.involved.length === 1;
+  const showProof = ph == null || (stageMs('proof') ?? Infinity) / 1000 <= ph;
   const protectedUsd = ungovRes && govRes ? ungovRes.spendUsd - govRes.spendUsd : undefined;
 
   return (
@@ -123,29 +126,29 @@ export function Drill() {
       <div className={`race-grid ${d.ab ? '' : 'race-grid--one'}`} data-tour="race">
         {d.ab && <RaceChart title="Ungoverned" tone="bad" pts={A} max={max} maxT={maxT} ph={ph} state={ungovRes ? `${secs(ungovRes.durationMs)} window, ${ungovRes.calls} calls` : active?.phase === 'ungoverned' ? 'running now' : 'not run yet'} note="Same fault, no controls: the agent keeps calling until the window ends." />}
         <RaceChart title={d.ab ? 'Governed' : 'With controls'} tone="cool" pts={B} max={max} maxT={maxT} ph={ph} marks={marks} state={govRes ? `${secs(govRes.durationMs)} window, ${govRes.calls} calls` : active?.phase === 'governed' ? 'running now' : 'not run yet'} note={d.name === 'scope-drift' ? 'Spend stays flat because every out-of-scope call is denied at the gateway.' : 'Same fault, controls on: slowed, paged, then stopped.'} />
-        {!d.ab && <Panel title={`${agent?.name ?? d.agent} on the map`} aside={<StateMark state={agState} />} id="tm-h" className="theatre-map">
-            <div className="map-frame map-frame--m"><FleetMap compact focus={d.name === 'ping-pong' ? undefined : d.agent} selected={null} onSelect={() => undefined} /></div>
-          </Panel>}
       </div>
       <div className="race-sum">
-        {protectedUsd != null ? <p><Measured /> Without controls the agent spent <strong className="measured">{usd(ungovRes!.spendUsd)}</strong>; with controls <strong className="measured">{usd(govRes!.spendUsd)}</strong>. That is <strong className="measured">{usd(protectedUsd)}</strong> not spent in this one window.</p> : govRes && !d.ab ? <p><Measured /> The agent spent <strong className="measured">{usd(govRes.spendUsd)}</strong> over <span className="measured">{govRes.calls}</span> calls in the window.</p> : <p className="muted">The result appears here when the window closes.</p>}
-        {canReplay && <button className="btn btn--sm" onClick={replay}><Rewind size={14} aria-hidden />Replay the race side by side</button>}
+        {protectedUsd != null ? <p><Measured /> Without controls the agent spent <strong className="measured">{usd(ungovRes!.spendUsd)}</strong>; with controls <strong className="measured">{usd(govRes!.spendUsd)}</strong>. That is <strong className="measured">{usd(protectedUsd)}</strong> not spent in this one window.</p> : govRes && !d.ab ? <p><Measured /> The agent spent <strong className="measured">{usd(govRes.spendUsd)}</strong> over <span className="measured">{govRes.calls}</span> calls in the window.</p> : <p className="muted">Run the drill to see what the controls saved.</p>}
       </div>
 
       <div className="theatre">
-        <Panel title="What happened, and how fast" className="stepper-panel" id="sp-h" aside={<span className="elapsed" aria-live="off">{elapsed != null ? <><span className="muted">Elapsed</span> <span className="measured elapsed-n">{elapsed.toFixed(1)} s</span></> : govRes?.timeToContainMs != null ? <><span className="muted">Contained in</span> <span className="measured elapsed-n">{secs(govRes.timeToContainMs)}</span></> : <span className="muted">Waiting for a governed run</span>}</span>}>
-          <Stepper g={g} res={govRes} t0={t0g} running={active?.phase === 'governed'} />
+        <Panel title={<>The roll, zoomed to {agent?.name ?? d.agent}</>} aside={<StateMark state={agState} />} id="tm-h" className="theatre-ring">
+          <div className="theatre-ringbox" data-tour="map"><RollRing compact selected={null} onSelect={(id) => { location.hash = `#/agent/${encodeURIComponent(id)}`; }} focus={zoomed ? d.agent : null} /></div>
         </Panel>
         <div className="theatre-proof" data-tour="proof">
-          {g?.byStage.kill_unconfirmed ? <KillUnconfirmed ev={g.byStage.kill_unconfirmed} /> : proof ? <ProofCard agentId={g!.agentId} proof={proof} /> : (
-            <section className="proof proof--wait"><CircleDashed size={28} aria-hidden /><div><h3>Proof appears here</h3><p>When the agent is stopped, a probe replays a call as that agent. A denial with a receipt is the proof.</p></div></section>
+          {showProof && g?.byStage.kill_unconfirmed ? <KillUnconfirmed ev={g.byStage.kill_unconfirmed} /> : showProof && proof ? <ProofCard agentId={g!.agentId} proof={proof} /> : (
+            <section className="proof proof--wait"><CircleDashed size={28} aria-hidden /><div><h3>The receipt prints here</h3><p>When the agent is stopped, a probe replays a call as that agent. A denial with a receipt id is the proof.</p></div></section>
           )}
-          {d.ab && <Panel title={`${agent?.name ?? d.agent} on the map`} aside={<StateMark state={agState} />} id="tm2-h" className="theatre-map">
-            <div className="map-frame map-frame--s"><FleetMap compact focus={d.agent} selected={null} onSelect={() => undefined} /></div>
-          </Panel>}
+          <div className="theatre-do">
+            <button className="btn" onClick={replay} disabled={!canReplay || ph != null}><Rewind size={14} aria-hidden />Replay this</button>
+            {ph != null && <span className="measured muted">replaying, {ph.toFixed(1)} s</span>}
+          </div>
           <OwnerLine agentId={d.agent} />
         </div>
       </div>
+      <Panel title="What happened, and how fast" className="stepper-panel" id="sp-h" aside={<span className="elapsed" aria-live="off">{elapsed != null ? <><span className="muted">Elapsed</span> <span className="measured elapsed-n">{elapsed.toFixed(1)} s</span></> : govRes?.timeToContainMs != null ? <><span className="muted">Contained in</span> <span className="measured elapsed-n">{secs(govRes.timeToContainMs)}</span></> : <span className="muted">Waiting for a governed run</span>}</span>}>
+        <Stepper g={g} res={govRes} t0={t0g} running={active?.phase === 'governed'} ph={ph} />
+      </Panel>
       </>}
     </div>
   );
@@ -157,21 +160,24 @@ function OwnerLine({ agentId }: { agentId: string }) {
   return <p className="muted">Pages go to <strong>{ownerShort(a.owner.name)}</strong> at <span className="measured">{a.owner.escalation}</span>. No real page is sent.</p>;
 }
 
-function Stepper({ g, res, t0, running }: { g: ReturnType<typeof groupIncidents>[number] | null; res?: DrillResult; t0?: number; running: boolean }) {
+function Stepper({ g, res, t0, running, ph }: { g: ReturnType<typeof groupIncidents>[number] | null; res?: DrillResult; t0?: number; running: boolean; ph: number | null }) {
   const firstWaiting = STEPS.findIndex((s) => !g?.byStage[s.stage] && res?.stages?.[s.stage] == null);
+  const msOf = (st: IncidentStage) => res?.stages?.[st] ?? (g?.byStage[st] && t0 != null ? g.byStage[st]!.ts - t0 : undefined);
+  const doneN = STEPS.filter((x) => { const m = msOf(x.stage); return m != null && (ph == null || m / 1000 <= ph); }).length;
   return (
-    <ol className="stepper">
+    <ol className="stepper" style={{ ['--fill' as string]: Math.max(0, doneN - 1) / (STEPS.length - 1) }}>
       {STEPS.map((s, i) => {
         const e = g?.byStage[s.stage];
-        const ms = res?.stages?.[s.stage] ?? (e && t0 != null ? e.ts - t0 : undefined);
-        const done = e != null || ms != null;
-        const cur = running && i === firstWaiting;
+        const ms0 = res?.stages?.[s.stage] ?? (e && t0 != null ? e.ts - t0 : undefined);
+        const done = (e != null || ms0 != null) && (ph == null || (ms0 ?? 0) / 1000 <= ph);
+        const ms = done ? ms0 : undefined;
+        const cur = ph == null && running && i === firstWaiting;
         return (
-          <motion.li key={s.stage} className={`step ${done ? 'is-done' : ''} ${cur ? 'is-cur' : ''}`} animate={done ? { opacity: 1 } : { opacity: 0.72 }}>
+          <motion.li key={s.stage} className={`step ${done ? 'is-done' : ''} ${cur ? 'is-cur' : ''}`} animate={done ? { opacity: 1 } : { opacity: 0.78 }}>
             <span className="step-i" aria-hidden="true">{done ? <Check size={14} /> : <span className="step-n">{i + 1}</span>}</span>
             <span className="step-t">{s.label}</span>
             <span className="step-time measured">{ms != null ? `+${(ms / 1000).toFixed(1)} s` : cur ? 'now' : 'waiting'}</span>
-            <span className="step-m">{e?.message ?? s.plain}</span>
+            <span className="step-m">{done && e?.message ? e.message : s.plain}</span>
             {done && <span className="visually-hidden"> done</span>}
           </motion.li>
         );

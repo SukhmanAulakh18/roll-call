@@ -19,7 +19,7 @@ const Replay = lazy(() => import('./screens/Replay').then((m) => ({ default: m.R
 
 export type Lens = 'exec' | 'ops' | 'eng';
 const LENSES: { id: Lens; label: string }[] = [{ id: 'exec', label: 'Executive' }, { id: 'ops', label: 'Operations' }, { id: 'eng', label: 'Engineering' }];
-const NAV = { fleet: ['', 'Fleet'], drill: ['drill', 'Drill'], admission: ['admission', 'Admission'], money: ['money', 'Spend and value'], eng: ['engineering', 'Engineering'], registry: ['registry', 'Registry'], replay: ['replay', 'Replay'] } as const;
+const NAV = { fleet: ['', 'The roll'], drill: ['drill', 'Drill'], admission: ['admission', 'Admission'], money: ['money', 'Spend and value'], eng: ['engineering', 'Engineering'], registry: ['registry', 'Registry'], replay: ['replay', 'Replay'] } as const;
 const ORDER: Record<Lens, (keyof typeof NAV)[]> = {
   exec: ['fleet', 'money', 'drill', 'admission', 'registry', 'eng', 'replay'],
   ops: ['fleet', 'drill', 'admission', 'registry', 'money', 'eng', 'replay'],
@@ -68,7 +68,7 @@ export function App() {
       <a href="#main" onClick={(e) => { e.preventDefault(); main.current?.focus(); }} className="skip">Skip to content</a>
       <header className="topbar">
         <div className="topbar-in">
-          <a href="#/" className="brand" aria-label="Roll Call, fleet map"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.2" className="brand-dot" /></svg>Roll Call</a>
+          <a href="#/" className="brand" aria-label="Roll Call, home"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="9.5" className="brand-ring" /><line x1="12" y1="12" x2="12" y2="3.5" className="brand-beam" /><circle cx="12" cy="12" r="2" className="brand-dot" /></svg>Roll Call</a>
           <nav aria-label="Screens" className="nav">
             {ORDER[lens].map((k) => {
               const [p, label] = NAV[k];
@@ -81,7 +81,7 @@ export function App() {
             <div className="seg seg--lens" role="radiogroup" aria-label="Lens">
               {LENSES.map((l) => <button key={l.id} role="radio" aria-checked={lens === l.id} onClick={() => { setLens(l.id); location.hash = '#/'; }}>{l.label}</button>)}
             </div>
-            <button className="btn btn--sm" onClick={() => setUi({ palette: true })} aria-label="Open command palette (Control K)"><CmdIcon size={14} aria-hidden /><span className="visually-hidden">Search</span><kbd>Ctrl K</kbd></button>
+            <button className="btn btn--sm" onClick={() => setUi({ palette: true })}><CmdIcon size={14} aria-hidden /><span className="visually-hidden">Search</span><kbd>Ctrl K</kbd></button>
             <button className="btn btn--sm btn--tour" onClick={() => setUi({ tour: 0 })}><GraduationCap size={14} aria-hidden /><span className="hide-s">Tour</span></button>
             <button className="btn btn--sm btn--icon" aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}</button>
             <button className="btn btn--sm btn--icon hide-s" aria-label="Presenter mode, larger type" aria-pressed={presenter} onClick={() => setPresenter(!presenter)}><Presentation size={16} aria-hidden /></button>

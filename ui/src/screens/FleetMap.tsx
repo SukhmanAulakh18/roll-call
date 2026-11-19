@@ -30,17 +30,18 @@ const AgentNode = memo(function AgentNode({ data }: NodeProps<Node<{ agent: Agen
       <Handle id="lt" type="target" position={Position.Left} isConnectable={false} style={{ top: '70%' }} />
       <Handle id="rt" type="target" position={Position.Right} isConnectable={false} style={{ top: '70%' }} />
       <Tip side={side === 'l' ? 'left' : 'right'} label={<div className="scope-tip"><strong>{a.name}</strong><span className="muted">may call</span><span className="measured">{a.scopes.tools.join('  ')}</span><span className="muted">may read</span><span className="measured">{a.scopes.data.join('  ')}</span></div>}>
-        <button type="button" className="anode-btn nodrag" onClick={() => c.select(a.id)} onMouseEnter={() => c.setHover(a.id)} onMouseLeave={() => c.setHover(null)} onFocus={() => c.setHover(a.id)} onBlur={() => c.setHover(null)} aria-label={`${a.name}, ${stateLabel(state)}. Open details.`} aria-pressed={c.selected === a.id}>
+        <button type="button" className="anode-btn nodrag" onClick={() => c.select(a.id)} onMouseEnter={() => c.setHover(a.id)} onMouseLeave={() => c.setHover(null)} onFocus={() => c.setHover(a.id)} onBlur={() => c.setHover(null)} aria-pressed={c.selected === a.id}>
           <StateRing state={state} />
           <span className="anode-main">
             <span className="anode-name">{a.name}</span>
             <span className="anode-group">{group}</span>
             <span className="anode-meta">
-              <Sparkline values={hist} w={74} h={20} tone={state === 'killed' ? 'muted' : state === 'healthy' ? 'cool' : 'amber'} label={`${a.name} spend per minute trend`} />
+              <Sparkline values={hist} w={74} h={20} tone={state === 'killed' ? 'muted' : state === 'healthy' ? 'cool' : 'warn'} label={`${a.name} spend per minute trend`} />
               <span className="measured">{typeof rate === 'number' ? `${usd(rate, 3)}/min` : 'no rate yet'}</span>
             </span>
           </span>
           <Initials name={a.owner.name} size={28} />
+          <span className="visually-hidden">, {stateLabel(state)}. Open details.</span>
         </button>
       </Tip>
       <span className="anode-state">{stateLabel(state)}</span>

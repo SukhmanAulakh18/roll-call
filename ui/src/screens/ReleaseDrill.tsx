@@ -33,7 +33,7 @@ export function ReleaseView({ name, run }: { name: 'bad-release' | 'good-release
   return (
     <div className="theatre theatre--release">
       <Panel title="What happened, and how fast" className="stepper-panel" id="rs-h" aside={res?.timeToRollbackMs != null ? <span className="elapsed"><span className="muted">Rolled back after</span> <span className="measured elapsed-n">{secs(res.timeToRollbackMs)}</span> <Measured /></span> : undefined}>
-        <ol className="stepper">
+        <ol className="stepper" style={{ ['--n' as string]: steps.length, ['--fill' as string]: Math.max(0, steps.filter((x) => evs?.byStage[x.stage]).length - 1) / Math.max(1, steps.length - 1) }}>
           {steps.map((s, i) => {
             const e = evs?.byStage[s.stage];
             const done = e != null, cur = running && i === firstWaiting;

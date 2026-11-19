@@ -59,7 +59,7 @@ export const VerdictChip = ({ v, code }: { v: ActionEvent['verdict']; code?: str
 );
 
 // ---------- tiny graphics ----------
-export function Sparkline({ values, w = 96, h = 24, label, tone = 'cool' }: { values: number[]; w?: number; h?: number; label?: string; tone?: 'cool' | 'amber' | 'bad' | 'muted' }) {
+export function Sparkline({ values, w = 96, h = 24, label, tone = 'cool' }: { values: number[]; w?: number; h?: number; label?: string; tone?: 'cool' | 'warn' | 'bad' | 'muted' }) {
   if (values.length < 2) return <svg width={w} height={h} role="img" aria-label={label ?? 'no trend yet'} className="spark spark--empty"><line x1="0" x2={w} y1={h - 2} y2={h - 2} /></svg>;
   const max = Math.max(...values, 1e-9), min = Math.min(...values, 0);
   const x = (i: number) => (i / (values.length - 1)) * (w - 2) + 1, y = (v: number) => h - 2 - ((v - min) / (max - min || 1)) * (h - 5);

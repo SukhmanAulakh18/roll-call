@@ -22,16 +22,14 @@ export function ProofCard({ agentId, proof, title = 'Stopped, and proven.' }: { 
   const reduce = useReducedMotion();
   const denied = proof.verdict === 'deny';
   return (
-    <motion.section className={`proof ${denied ? 'is-ok' : 'is-bad'}`} role="status" initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}>
-      <svg className="proof-check" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">
-        <motion.circle cx="24" cy="24" r="21" fill="none" strokeWidth="2.5" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.55, ease: 'easeOut' }} />
-        <motion.path d="M14 25l7 7 13-15" fill="none" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" initial={reduce ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.5, duration: 0.35, ease: 'easeOut' }} />
-      </svg>
-      <div>
-        <h3>{denied ? title : 'The probe was not blocked.'}</h3>
-        <p className="proof-line">Probe replayed <code className="measured">{proof.attemptedTool}</code> as <code className="measured">{agentId}</code> <span aria-hidden="true">→</span> <strong>{proof.verdict === 'deny' ? 'DENIED' : proof.verdict.toUpperCase()} ({proof.code})</strong> <span className="measured">receipt {proof.receiptId}</span></p>
-        <button className="btn btn--sm" onClick={() => { const a = getState().actions.find((x) => x.receiptId === proof.receiptId); if (a) setUi({ receipt: a }); else toast('Receipt is not in this browser session yet.', { description: proof.receiptId }); }}><Link2 size={14} aria-hidden />Open receipt</button>
-      </div>
+    <motion.section className={`proof receipt ${denied ? 'is-ok' : 'is-bad'}`} role="status" initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}>
+      <p className="receipt-k">Receipt <span className="measured">{proof.receiptId}</span></p>
+      <h3>{denied ? title : 'The probe was not blocked.'}</h3>
+      <p className="proof-line">Probe replayed <code className="measured">{proof.attemptedTool}</code> as <code className="measured">{agentId}</code>. Result: <strong>{proof.verdict === 'deny' ? 'DENIED' : proof.verdict.toUpperCase()} ({proof.code})</strong></p>
+      <motion.span className="stamp" aria-hidden="true" initial={reduce ? false : { opacity: 0, scale: 1.9, rotate: -2 }} animate={{ opacity: 1, scale: 1, rotate: -9 }} transition={{ delay: 0.45, type: 'spring', stiffness: 520, damping: 22 }}>
+        {denied ? <Check size={18} strokeWidth={3} /> : <ShieldOff size={18} strokeWidth={3} />}{denied ? 'Refused' : 'Open'}
+      </motion.span>
+      <button className="btn btn--sm" onClick={() => { const a = getState().actions.find((x) => x.receiptId === proof.receiptId); if (a) setUi({ receipt: a }); else toast('Receipt is not in this browser session yet.', { description: proof.receiptId }); }}><Link2 size={14} aria-hidden />Open receipt</button>
     </motion.section>
   );
 }

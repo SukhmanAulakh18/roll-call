@@ -8,11 +8,12 @@ import type { ActionEvent } from '../../../contracts/types';
 import { getState, runDrill, useStore, verifyReceipts } from '../store';
 import { setUi, useUi } from '../ui-state';
 import { Lifecycle } from '../gates';
-import { Assumption, CountUp, Initials, Measured, NotMeasured, Sparkline, StateMark, Tip, VerdictChip, VerifyButton, clock, groupIncidents, isNum, ownerShort, secs, useLocal, usd, type AgentState } from '../ui';
+import { Assumption, CountUp, Initials, NotMeasured, Sparkline, StateMark, Tip, VerdictChip, VerifyButton, clock, groupIncidents, isNum, ownerShort, secs, useLocal, usd, type AgentState } from '../ui';
 import { Panel } from '../components';
 import { Suspense, lazy } from 'react';
 const FleetMap = lazy(() => import('./FleetMap').then((m) => ({ default: m.FleetMap })));
 import { computeStats } from '../graph';
+import { RollRing } from '../ring';
 
 // ---------------- hero numbers ----------------
 interface TileProps { q: string; children: React.ReactNode; note?: React.ReactNode; viz?: React.ReactNode; verify: Parameters<typeof VerifyButton>[0]['spec']; extra?: React.ReactNode }
@@ -38,6 +39,14 @@ function StateStrip() {
   );
 }
 
+/** Governed decisions per 5 s bucket over the last two minutes, from the stream. */
+function decisionTrace(actions: ActionEvent[]): number[] {
+  const last = actions[actions.length - 1]?.ts; if (!last) return [];
+  const out = new Array<number>(24).fill(0);
+  for (let i = actions.length - 1; i >= 0; i--) { const k = Math.floor((last - actions[i].ts) / 5000); if (k >= 24) break; if (actions[i].governed) out[23 - k]++; }
+  return out;
+}
+
 function RangeBar({ p50, p95, max }: { p50: number; p95: number; max: number }) {
   const f = (v: number) => `${Math.min(100, (v / max) * 100)}%`;
   return (
@@ -48,7 +57,7 @@ function RangeBar({ p50, p95, max }: { p50: number; p95: number; max: number }) 
   );
 }
 
-export function Hero() {
+export function Instruments() {
   const lens = useUi((u) => u.lens);
   const impact = useStore((s) => s.impact);
   const fleet = useStore((s) => s.fleet);
@@ -91,7 +100,7 @@ export function Hero() {
   const prove = (
     <Tile q="Can I prove it?" verify={{ title: 'Receipts this session', what: 'Governed gateway decisions delivered on the stream since this page connected. Verify recomputes every hash chain on the gateways.', field: 'Live stream: action events (governed: true). Chain: GET /v1/receipts/verify', shown: `${governed.length} decisions`, kind: 'measured', command: 'make verify' }}
       extra={<button className="btn btn--sm btn--primary" onClick={run} disabled={busy}>{busy ? 'Checking' : 'Verify chain'}</button>}
-      viz={chain ? <span className={`chainstate ${chain.ok ? 'is-ok' : 'is-bad'}`} role="status">{chain.ok ? 'Chain ' : 'Chain '}{chain.text}</span> : <span className="muted nowrap">Not verified yet</span>}
+      viz={<div className="viz-stack"><Sparkline values={decisionTrace(actions)} w={150} h={28} label="Governed decisions per five seconds, last two minutes" />{chain ? <span className={`chainstate ${chain.ok ? 'is-ok' : 'is-bad'}`} role="status">Chain {chain.text}</span> : <span className="muted nowrap">Chain not verified yet</span>}</div>}
       note={<><span className="measured">{blocked}</span> denied or slowed so far</>}>
       <CountUp value={governed.length} format={(n) => Math.round(n).toLocaleString('en-US')} /><span className="reading-unit"> decisions</span>
     </Tile>
@@ -113,7 +122,7 @@ export function Hero() {
   );
   const set = lens === 'ops' ? [exist, ops, contain, prove] : lens === 'eng' ? [exist, eng1, eng2, prove] : [exist, cost, contain, prove];
   return (
-    <div data-tour="tiles"><section className="tiles" aria-label="Headline numbers">
+    <div data-tour="tiles"><section className="tiles" aria-label="The four questions">
       {set.map((t, i) => <div key={i} className="tiles-cell">{t}</div>)}
     </section>{source === 'fixture' && <p className="tiles-note">These numbers are fixture placeholders, not a real run.</p>}</div>
   );
@@ -272,26 +281,40 @@ function IncidentBanner() {
 
 // ---------------- screen ----------------
 export function Fleet({ selected }: { selected: string | null }) {
-  const [tab, setTab] = useLocal<'decisions'>('rightTab', 'decisions');
-  void tab; void setTab;
+  const [view, setView] = useLocal<'roll' | 'topology'>('view', 'roll');
   const select = (id: string | null) => { location.hash = id ? `#/agent/${encodeURIComponent(id)}` : '#/'; };
-  const [tall, setTall] = useState(false);
   const goDrill = () => { const r = getState().drillRun; location.hash = '#/drill'; if (!r || r.phase === 'done' || r.phase === 'error') void runDrill('runaway-loop', true); };
+  const source = useStore((s) => s.source);
   return (
     <div className="fleet">
-      <div className="intro">
-        <p className="intro-t">Roll Call watches a bank's AI agents (software workers) and can stop one that goes wrong, with proof.</p>
-        <button className="btn btn--primary btn--lg" onClick={goDrill}><Play size={16} aria-hidden />Run a drill</button>
-      </div>
-      <Hero />
-      <IncidentBanner />
-      <div className={`stage ${selected ? 'has-side' : ''}`}>
-        <Panel className="map-panel" title="Fleet map" aside={<><Measured />{!selected && <button className="btn btn--sm" onClick={() => setTall(!tall)} aria-pressed={tall}>{tall ? 'Shrink map' : 'Expand map'}</button>}</>} id="map-h">
-          <div className={`map-frame ${tall || selected ? '' : 'map-frame--home'}`} data-tour="map"><Suspense fallback={<p className="empty" role="status">Loading the map</p>}><FleetMap selected={selected} onSelect={select} /></Suspense></div>
+      <section className={`hero ${selected ? 'has-side' : ''}`}>
+        <div className="hero-l">
+          {selected ? <AgentPanel id={selected} onClose={() => select(null)} /> : (
+            <>
+              <h1 className="hero-h">Every agent answers the roll.</h1>
+              <p className="hero-p">Roll Call watches a bank's AI agents (software workers) and can stop one that goes wrong, with proof.</p>
+              <div className="hero-a">
+                <button className="btn btn--primary btn--lg" onClick={goDrill}><Play size={16} aria-hidden />Run a drill</button>
+                <a className="btn btn--lg" href="#/replay">Watch a recorded run</a>
+              </div>
+              {source === 'fixture' && <p className="hero-n">Fixture mode: the roll below is invented placeholder data.</p>}
+            </>
+          )}
+        </div>
+        <Panel className="ring-panel" title={view === 'roll' ? 'The roll' : 'Topology'} id="map-h" aside={
+          <div className="seg" role="group" aria-label="Fleet view">
+            <button aria-pressed={view === 'roll'} onClick={() => setView('roll')}>Roll</button>
+            <button aria-pressed={view === 'topology'} onClick={() => setView('topology')}>Topology</button>
+          </div>}>
+          <div className="ring-frame" data-tour="map">
+            {view === 'roll' ? <RollRing selected={selected} onSelect={select} /> : <div className="map-frame map-frame--home"><Suspense fallback={<p className="empty" role="status">Loading the topology</p>}><FleetMap selected={selected} onSelect={select} /></Suspense></div>}
+          </div>
+          {view === 'roll' && <p className="ring-hint">Arrow keys move around the ring. Enter opens an agent record.</p>}
         </Panel>
-        {selected ? <AgentPanel id={selected} onClose={() => select(null)} /> : <Ticker className="stage-ticker" />}
-      </div>
-      {selected && <Ticker className="ticker--wide" />}
+      </section>
+      <Instruments />
+      <IncidentBanner />
+      <Ticker className="ticker--wide" />
     </div>
   );
 }

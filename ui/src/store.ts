@@ -13,13 +13,15 @@ export interface S {
   source: Source; impact: Impact | null; impactErr: boolean; agents: AgentRecord[]; fleet: FleetSummary | null;
   actions: ActionEvent[]; incidents: IncidentEvent[]; admissions: (AdmissionResult & { workload: string; ts: number })[];
   totals: Totals; spendHist: Record<string, number[]>; fleetHist: { t: number; total: number }[]; connected: boolean; updatedAt: number | null; drillRun: DrillRun | null;
+  /** last time each agent answered the roll: any governed or direct call, or a fleet heartbeat that did not report it stopped. */
+  beat: Record<string, number>;
   replay: { status: 'loading' | 'playing' | 'paused' | 'done' | 'empty'; pos: number; speed: number; marks: { pos: number; stage: string; agentId: string }[]; startTs: number; spanMs: number };
 }
 
 const emptyTotals = (): Totals => ({ cost: {}, costTool: {}, callsTool: {}, tasks: {}, first: null, last: null });
 const initial = (source: Source): S => ({
   source, impact: null, impactErr: false, agents: [], fleet: null, actions: [], incidents: [], admissions: [], totals: emptyTotals(), spendHist: {}, fleetHist: [],
-  connected: false, updatedAt: null, drillRun: null, replay: { status: 'loading', pos: 0, speed: 4, marks: [], startTs: 0, spanMs: 0 },
+  connected: false, updatedAt: null, drillRun: null, beat: {}, replay: { status: 'loading', pos: 0, speed: 4, marks: [], startTs: 0, spanMs: 0 },
 });
 
 let state: S = initial(FIXTURE ? 'fixture' : 'live');
@@ -42,10 +44,11 @@ function flush() {
   if (!msgs.length) return;
   set((s) => {
     const p: Partial<S> = { updatedAt: Date.now() };
+    const beat = { ...s.beat }; const nowT = Date.now();
     let actions = s.actions, incidents = s.incidents, admissions = s.admissions, totals = s.totals, spendHist = s.spendHist, fleetHist = s.fleetHist;
     for (const m of msgs) {
       if (m.type === 'action') {
-        const a = m.data;
+        const a = m.data; beat[a.agentId] = nowT;
         actions = actions.length >= 4000 ? [...actions.slice(-3000), a] : [...actions, a];
         if (a.governed) {
           if (totals === s.totals) totals = { ...totals, cost: { ...totals.cost }, costTool: { ...totals.costTool }, callsTool: { ...totals.callsTool }, tasks: { ...totals.tasks } };
@@ -59,13 +62,14 @@ function flush() {
         if (!incidents.some((i) => i.incidentId === m.data.incidentId && i.stage === m.data.stage)) incidents = [...incidents, m.data].slice(-300);
       } else if (m.type === 'fleet') {
         p.fleet = m.data;
+        for (const [id, st] of Object.entries(m.data.states ?? {})) if (st !== 'killed') beat[id] = nowT;
         spendHist = { ...spendHist };
         for (const [id, v] of Object.entries(m.data.spendPerMinUsd ?? {})) spendHist[id] = [...(spendHist[id] ?? []).slice(-59), v];
         fleetHist = [...fleetHist.slice(-119), { t: msgTs(m) ?? Date.now(), total: Object.values(m.data.spendPerMinUsd ?? {}).reduce((a, b) => a + b, 0) }];
       }
       else if (m.type === 'admission') admissions = [m.data, ...admissions].slice(0, 50);
     }
-    return { ...p, actions, incidents, admissions, totals, spendHist, fleetHist };
+    return { ...p, actions, incidents, admissions, totals, spendHist, fleetHist, beat };
   });
 }
 
