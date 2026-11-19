@@ -118,6 +118,50 @@ services:
       timeout: 3s
       retries: 10
 
+  # ---- observability (profile "observability"; `make observe`). Not started by plain `make compose-up`.
+  prometheus:
+    image: prom/prometheus:v3.5.0   # Apache-2.0
+    profiles: [observability]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=35d   # the 30 d error-budget window needs more than the 15 d default
+      - --web.enable-remote-write-receiver  # only used by the optional otel-collector
+    volumes:
+      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on: [control, gateway-1, gateway-2]
+
+  grafana:
+    image: grafana/grafana-oss:11.6.0   # AGPL-3.0: run unmodified as a separate container, never linked or bundled (docs/slo.md)
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"        # lab only: read-only viewer without login
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: admin        # lab only
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0   # Apache-2.0
+    profiles: [otel]
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ../observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on: [prometheus]
+
 volumes:
+  prometheus-data:
   rollcall-data:
   valkey-data:

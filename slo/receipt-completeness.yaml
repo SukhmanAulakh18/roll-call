@@ -1,0 +1,26 @@
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: receipt-completeness
+  displayName: Receipt completeness
+spec:
+  service: roll-call-gateway
+  description: 'Every governed decision appends a hash-chained receipt: receipts appended / decisions made. The target is 100%; 0.001% only gives the burn-rate maths a budget. Any gap also pages immediately (ReceiptGap).'
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 30d
+      isRolling: true
+  objectives:
+    - displayName: Receipt completeness
+      target: 0.99999
+      ratioMetrics:
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_gateway_receipts_total[$window]))'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_gateway_decisions_total[$window]))'

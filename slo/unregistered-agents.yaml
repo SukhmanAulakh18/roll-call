@@ -1,0 +1,26 @@
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: unregistered-agents
+  displayName: No unregistered agents running
+spec:
+  service: roll-call-control
+  description: 'Share of five-minute samples with zero unregistered agents running. The target is zero at all times; the 0.1% allowance only gives the burn-rate maths a budget. Any sample above zero also pages immediately (UnregisteredAgentRunning).'
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 30d
+      isRolling: true
+  objectives:
+    - displayName: No unregistered agents running
+      target: 0.999
+      ratioMetrics:
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(sum_over_time((rollcall_control_unregistered_running == bool 0)[$window:5m]))'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(count_over_time(rollcall_control_unregistered_running[$window:5m]))'

@@ -114,7 +114,7 @@ type Call = { tool: string; args: Record<string, unknown>; target?: string };
 export async function startFleet(opts: FleetOpts): Promise<FleetHandle> {
   const recs = opts.agents ?? FLEET;
   const seed = opts.seed ?? 1;
-  type A = { rec: AgentRecord; running: boolean; fault?: Fault; token: string; exp: number; ttl: number; n: number; rng: Rng; gen: number; wake?: () => void; timer?: NodeJS.Timeout; loop?: Promise<void>; fixed?: Call[]; st: { calls: number; allow: number; deny: number; throttle: number; errors: number } };
+  type A = { rec: AgentRecord; running: boolean; fault?: Fault; token: string; exp: number; ttl: number; n: number; rng: Rng; gen: number; wake?: () => void; timer?: NodeJS.Timeout; loop?: Promise<void>; fixed?: Call[]; base?: string; share?: number; canaryFault?: 'errors'; st: { calls: number; allow: number; deny: number; throttle: number; errors: number } };
   const agents = new Map<string, A>();
   for (const rec of recs) agents.set(rec.id, { rec, running: false, token: '', exp: 0, ttl: 60_000, n: 0, rng: mulberry32(strHash(rec.id) + seed), gen: 0, st: { calls: 0, allow: 0, deny: 0, throttle: 0, errors: 0 } });
   let gwRound = 0;
@@ -130,13 +130,15 @@ export async function startFleet(opts: FleetOpts): Promise<FleetHandle> {
   }
 
   function nextCall(a: A): Call {
-    const b = BASELINE[a.rec.id], f = a.fault, n = a.n++;
+    const b = BASELINE[a.base ?? a.rec.id], f = a.fault, n = a.n++;
     const normal = (): Call => {
       let w = Math.random(); // tool choice need not be reproducible; arguments are (seeded)
       const tot = b.mix.reduce((s, [, x]) => s + x, 0); w = a.rng() * tot;
       let tool = b.mix[0][0]; for (const [t, x] of b.mix) { if ((w -= x) < 0) { tool = t; break; } }
       return { tool, args: ARGS[tool](a.rng, a.rec, n), target: tool === 'agent.call' ? b.target : undefined };
     };
+    // Bad release: every 3rd call of the new version sends an empty accountId, which the mock ledger rejects (a regression in request building).
+    if (a.canaryFault === 'errors' && n % 3 === 0) return { tool: 'ledger.read', args: { accountId: '' } };
     if (!f) return normal();
     switch (f.kind) {
       case 'runaway-loop': return n % 2 ? { tool: 'llm.complete', args: { prompt: 'invoice-recon: retry reconcile INV-77031' } } : { tool: 'ledger.read', args: { accountId: '400000771031' } };
@@ -177,7 +179,7 @@ export async function startFleet(opts: FleetOpts): Promise<FleetHandle> {
   async function run(a: A, gen: number): Promise<void> {
     let next = Date.now() + a.rng() * 400;                                  // stagger starts
     while (a.running && a.gen === gen) {
-      const f = a.fault, rate = f?.rate ?? BASELINE[a.rec.id].rate;
+      const f = a.fault, rate = (f?.rate ?? BASELINE[a.base ?? a.rec.id].rate) * (a.share ?? 1);
       const jitter = f && f.kind !== 'healthy-burst' ? 0.1 : 0.5;          // faults are metronomic; normal traffic is bursty
       next += (1000 / rate) * (1 + (a.rng() - 0.5) * jitter);
       const wait = next - Date.now();
@@ -195,7 +197,7 @@ export async function startFleet(opts: FleetOpts): Promise<FleetHandle> {
   const clear = async (id?: string) => { for (const a of id ? [agents.get(id)!] : agents.values()) { if (!a) continue; a.fault = undefined; a.wake?.(); } };
 
   const handle: FleetHandle = {
-    running: async () => [...agents.values()].filter(a => a.running).map(a => a.rec.id),
+    running: async () => [...agents.values()].filter(a => a.running && !a.base).map(a => a.rec.id),   // canary variants are not separate registered agents
     start, stop, clear,
     async inject(id, kind, mode) {
       const a = agents.get(id); if (!a) throw new Error(`unknown agent '${id}'`);
@@ -205,7 +207,19 @@ export async function startFleet(opts: FleetOpts): Promise<FleetHandle> {
       if (kind === 'ping-pong' && PARTNER[id]) { const p = agents.get(PARTNER[id])!; p.fault = { kind, mode, rate: FAULT_RATE[kind]!, target: id }; p.wake?.(); }
       a.wake?.();
     },
-    async reset() { await clear(); for (const id of agents.keys()) await start(id); },
+    /** Run a second variant of `agentId` that acts as `variantId`; the stable one gives up `share` of its traffic. */
+    async startCanary(agentId, variantId, share, fault) {
+      const s = agents.get(agentId); if (!s || agents.has(variantId)) throw new Error(`cannot start canary '${variantId}' for '${agentId}'`);
+      s.share = 1 - share; s.wake?.();
+      const v: A = { rec: { ...s.rec, id: variantId }, base: agentId, share, canaryFault: fault, running: false, token: '', exp: 0, ttl: 60_000, n: 0, rng: mulberry32(strHash(variantId) + seed), gen: 0, st: { calls: 0, allow: 0, deny: 0, throttle: 0, errors: 0 } };
+      agents.set(variantId, v); await start(variantId);
+    },
+    async stopCanary(variantId) {
+      const v = agents.get(variantId); if (!v?.base) return;
+      await stop(variantId); await v.loop; agents.delete(variantId);
+      const s = agents.get(v.base); if (s) { s.share = 1; s.wake?.(); }
+    },
+    async reset() { for (const id of [...agents.keys()]) if (agents.get(id)!.base) await handle.stopCanary(id); await clear(); for (const id of agents.keys()) await start(id); },
     stats: () => Object.fromEntries([...agents].map(([k, a]) => [k, { ...a.st }])),
     async close() { for (const id of agents.keys()) await stop(id); await Promise.all([...agents.values()].map(a => a.loop)); },
   };
@@ -221,6 +235,8 @@ export async function serveFleet(fleet: FleetControl, port: number, host?: strin
   r.add('POST', '/fleet/start', async c => { await fleet.start((await c.json()).agentId); return ok({ ok: true }); });
   r.add('POST', '/fleet/inject', async c => { const b = await c.json(); await fleet.inject(b.agentId, b.kind, b.mode); return ok({ ok: true }); });
   r.add('POST', '/fleet/clear', async c => { await fleet.clear((await c.json()).agentId); return ok({ ok: true }); });
+  r.add('POST', '/fleet/canary', async c => { const b = await c.json(); await fleet.startCanary(b.agentId, b.variantId, b.share, b.fault); return ok({ ok: true }); });
+  r.add('POST', '/fleet/canary/stop', async c => { await fleet.stopCanary((await c.json()).variantId); return ok({ ok: true }); });
   r.add('POST', '/fleet/reset', async () => { await fleet.reset(); return ok({ ok: true }); });
   r.add('GET', '/healthz', () => ok({ ok: true }));
   const server = http.createServer(async (req, res) => { if (!(await r.handle(req, res))) { res.writeHead(404); res.end(); } });

@@ -5,7 +5,7 @@ import type { Gateway } from '../services/gateway/src/app.ts';
 import { startFleet } from './fleet.ts';
 import type { FleetHandle } from './fleet.ts';
 import { startTools } from './tools.ts';
-import { runDrill } from './drills.ts';
+import { RELEASE_DRILLS, runDrill, runReleaseDrill } from './drills.ts';
 
 export interface StackOpts {
   dataDir: string; gateways?: number; fleet?: boolean; tickMs?: number; uiDir?: string;
@@ -40,6 +40,6 @@ export async function startStack(o: StackOpts): Promise<Stack> {
       await tools.close();
     },
   };
-  control.setDrillRunner((name, mode) => runDrill(stack, name, mode));
+  control.setDrillRunner((name, mode) => (name in RELEASE_DRILLS ? runReleaseDrill(stack, name) : runDrill(stack, name, mode)));
   return stack;
 }

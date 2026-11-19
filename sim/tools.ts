@@ -39,6 +39,7 @@ export async function startTools(opts: { port?: number; host?: string } = {}): P
       approvals.push(q); if (approvals.length > 5000) approvals.shift();
       return ok({ result: { queueId: q.queueId, status: q.status } });
     }
+    if (name === 'ledger.read' && b.args?.accountId === '') return fail(422, 'accountId must not be empty');
     const fn = TOOLS[name]; if (!fn) return fail(404, `unknown tool '${name}'`);
     return ok(fn(b.args ?? {}, { agentId: b.agentId, targetAgentId: b.targetAgentId }));
   });

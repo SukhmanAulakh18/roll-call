@@ -1,0 +1,26 @@
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: decision-latency-p99
+  displayName: Decision p99 within 50 ms
+spec:
+  service: roll-call-gateway
+  description: '99% of governed decisions finish their decision path in 50 ms or less, which is p99 <= 50 ms. Tool time is excluded.'
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 30d
+      isRolling: true
+  objectives:
+    - displayName: Decision p99 within 50 ms
+      target: 0.99
+      ratioMetrics:
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_gateway_decision_seconds_bucket{le="0.05"}[$window]))'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_gateway_decision_seconds_count[$window]))'

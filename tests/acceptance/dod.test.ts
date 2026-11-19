@@ -88,3 +88,23 @@ test('DoD5: impact.json has bench p50/p95/p99, throughput and overhead vs ungove
   assert.ok(Number.isFinite(i.bench.overheadP99Ms));
   assert.ok(i.bench.throughputRps > 0);
 });
+
+test('DoD8: a bad release is rolled back automatically, a good release is promoted', async () => {
+  const { startStack } = await import('../../sim/stack.ts');
+  const { runReleaseDrill } = await import('../../sim/drills.ts');
+  const s = await startStack({ dataDir: tmp() });
+  try {
+    const stable = s.control.registry.get('invoice-recon')!.version;
+    const bad = await runReleaseDrill(s, 'bad-release');
+    assert.equal(bad.outcome, 'rolled_back');
+    assert.ok(bad.timeToRollbackMs! > 0 && bad.stages.canary_started! <= bad.stages.detected! && bad.stages.detected! <= bad.stages.rolled_back!);
+    assert.equal(s.control.registry.get('invoice-recon')!.version, stable, 'record stays at the stable version');
+    assert.equal(bad.gates!.find(g => g.name === 'Canary analysis')!.passed, false);
+    const tok = await post(`${s.control.url}/v1/identity/token`, { agentId: `invoice-recon@${s.control.releases.list()[0].candidateVersion}` });
+    assert.equal(tok.status, 404, 'the rolled-back canary identity is gone');
+    assert.ok((await s.fleet.running()).includes('invoice-recon'), 'stable keeps running');
+    const good = await runReleaseDrill(s, 'good-release');
+    assert.equal(good.outcome, 'promoted', JSON.stringify(good.gates));
+    assert.notEqual(s.control.registry.get('invoice-recon')!.version, stable);
+  } finally { await s.close(); }
+});

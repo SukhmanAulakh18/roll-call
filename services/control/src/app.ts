@@ -10,6 +10,7 @@ import { checkRecord, review } from './admission.ts';
 import { createEngine } from './engine.ts';
 import { createMetrics } from './metrics.ts';
 import { issueToken } from './identity.ts';
+import { baseOf, createReleases } from './releases.ts';
 import { createRegistry } from './registry.ts';
 import type { DrillMode, FleetControl } from './runtime.ts';
 
@@ -25,7 +26,7 @@ export interface ControlOpts {
 }
 export interface ControlHandle {
   url: string; close(): Promise<void>;
-  registry: ReturnType<typeof createRegistry>; engine: ReturnType<typeof createEngine>;
+  registry: ReturnType<typeof createRegistry>; engine: ReturnType<typeof createEngine>; releases: ReturnType<typeof createReleases>;
   reset(): Promise<void>;
   setGateways(urls: string[]): void; setRuntime(r: FleetControl): void; setDrillRunner(f: NonNullable<ControlOpts['drillRunner']>): void;
 }
@@ -53,6 +54,8 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
     mintToken: (id, t) => issueToken(id, t, clock()).token, ackMs: opts.ackMs,
   });
 
+  const releases = createReleases({ registry, engine, clock, publish, runtime: () => runtime, acks: () => acks, impact: () => { try { return JSON.parse(readFileSync(opts.impactFile ?? 'impact.json', 'utf8')); } catch { return null; } } });
+
   const r = createRouter(CORS);
   r.add('GET', '/healthz', () => ok({ ok: true, bundleVersion: registry.version() }));
   r.add('GET', '/metrics', async () => { const f = await engine.summary(); return { status: 200, body: metrics.render({ ...f, bundleVersion: registry.version(), acks, now: clock() }) }; });
@@ -68,16 +71,16 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
     registry.upsert(rec); return { status: 201, body: rec };
   });
   r.add('POST', '/v1/identity/token', async c => {
-    const { agentId } = await c.json(); const rec = registry.get(agentId);
-    if (!rec) return fail(404, `agent '${agentId}' is not registered`, { code: 'UNREGISTERED' });
-    if (registry.isRevoked(agentId)) return fail(403, `identity for '${agentId}' has been revoked`, { code: 'REVOKED' });
+    const { agentId } = await c.json(); const rec = registry.get(baseOf(String(agentId)));
+    if (!rec || (agentId !== rec.id && !releases.isActive(agentId))) return fail(404, `agent '${agentId}' is not registered`, { code: 'UNREGISTERED' });
+    if (registry.isRevoked(rec.id)) return fail(403, `identity for '${agentId}' has been revoked`, { code: 'REVOKED' });
     if (rec.lifecycleState === 'retired') return fail(403, `agent '${agentId}' is retired`, { code: 'RETIRED' });
     const t = issueToken(agentId, ttl, clock()); tokens.set(agentId, t); return ok(t);
   });
   r.add('GET', '/v1/bundle', c => {
     const gw = c.query.get('gw'), v = Number(c.query.get('v'));
     if (gw && Number.isFinite(v)) acks[gw] = { version: v, ts: clock() };
-    return ok(registry.bundle(clock(), opts.staleAfterMs ?? 2000));
+    return ok(releases.decorate(registry.bundle(clock(), opts.staleAfterMs ?? 2000)));
   });
   r.add('POST', '/v1/events', async c => { const b = await c.json(); if (!Array.isArray(b.events)) return fail(400, 'events[] required'); engine.ingest(b.events); return ok({ accepted: b.events.length }); });
   r.add('GET', '/v1/stream', async c => {
@@ -87,7 +90,21 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
     c.res.write(`data: ${JSON.stringify({ type: 'fleet', data: await engine.summary() })}\n\n`);
     return null;
   });
-  r.add('GET', '/v1/incidents', c => ok(engine.incidents(c.query.get('agentId') ?? undefined).slice(-500)));
+  r.add('GET', '/v1/incidents', c => { const id = c.query.get('agentId') ?? undefined; return ok([...engine.incidents(id), ...releases.log.filter(e => !id || e.agentId === id)].sort((a, b) => a.ts - b.ts).slice(-500)); });
+  // Lifecycle promotion (ADR-014). 200 = allowed, 409 = blocked; both carry the PromotionResult. ?dryRun=1 changes nothing.
+  r.add('POST', '/v1/agents/:id/promote', async c => {
+    if (!registry.get(c.params.id)) return fail(404, `no agent '${c.params.id}'`);
+    const to = (await c.json().catch(() => ({})))?.to ?? c.query.get('to');
+    if (!['draft', 'shadow', 'canary', 'production', 'retired'].includes(to)) return fail(422, "'to' must be one of shadow, canary, production, retired", { code: 'BAD_STATE' });
+    const res = await releases.promote(c.params.id, to, ['1', 'true'].includes(c.query.get('dryRun') ?? ''));
+    return { status: res.allowed ? 200 : 409, body: res };
+  });
+  r.add('POST', '/v1/agents/:id/releases', async c => {
+    const b = await c.json().catch(() => ({}));
+    try { return { status: 201, body: await releases.start(c.params.id, { version: b?.version, fault: b?.fault === 'errors' ? 'errors' : undefined }) }; }
+    catch (e) { return fail(409, (e as Error).message); }
+  });
+  r.add('GET', '/v1/releases', () => ok(releases.list()));
   r.add('POST', '/v1/agents/:id/kill', async c => {
     if (!registry.get(c.params.id)) return fail(404, `no agent '${c.params.id}'`);
     const b = await c.json().catch(() => ({}));
@@ -107,7 +124,7 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
     try { return ok(await drillRunner(c.params.name, b?.mode === 'ungoverned' ? 'ungoverned' : 'governed')); }
     catch (e) { return fail(400, (e as Error).message); } finally { drilling = false; }
   });
-  const reset = async () => { registry.reset(); engine.reset(); tokens.clear(); await runtime?.reset(); };
+  const reset = async () => { registry.reset(); engine.reset(); releases.reset(); tokens.clear(); await runtime?.reset(); };
   r.add('POST', '/v1/reset', async () => { await reset(); return ok({ ok: true }); });
   r.add('GET', '/v1/fleet', async () => ok(await engine.summary()));
   r.add('GET', '/v1/pages', () => ok(engine.pages));
@@ -138,11 +155,11 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
 
   const tickMs = opts.tickMs ?? 250;
   const timers: NodeJS.Timeout[] = [];
-  if (tickMs > 0) timers.push(setInterval(() => { try { engine.tick(); } catch (e) { console.error('engine tick failed', e); } }, tickMs));
+  if (tickMs > 0) timers.push(setInterval(() => { try { engine.tick(); releases.tick(); } catch (e) { console.error('engine tick failed', e); } }, tickMs));
   timers.push(setInterval(async () => { if (clients.size) publish({ type: 'fleet', data: await engine.summary() }); }, 1000));
   let closed = false;
   return {
-    url, registry, engine, reset,
+    url, registry, engine, releases, reset,
     setGateways: u => { gateways = u; }, setRuntime: f => { runtime = f; }, setDrillRunner: f => { drillRunner = f; },
     async close() {
       if (closed) return; closed = true;

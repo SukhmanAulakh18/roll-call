@@ -1,0 +1,58 @@
+# promtool test rules deploy/observability/prometheus/tests/slo.test.yml
+rule_files:
+  - ../rules/slo.rules.yml
+  - ../rules/invariants.rules.yml
+evaluation_interval: 1m
+tests:
+  - name: fast burn pages (and the slower windows follow)
+    interval: 1m
+    input_series:
+      # gw-1: 1000 decisions/min, 10% are 502 TOOL_ERROR from minute 0 -> error ratio 0.1, burn rate 200x the 0.05% budget
+      - series: 'rollcall_gateway_decisions_total{gateway="gw-1",verdict="allow",code="OK"}'
+        values: '0+900x80'
+      - series: 'rollcall_gateway_decisions_total{gateway="gw-1",verdict="deny",code="TOOL_ERROR"}'
+        values: '0+100x80'
+      # latency: all decisions under 50 ms, so that SLO must stay quiet
+      - series: 'rollcall_gateway_decision_seconds_bucket{gateway="gw-1",le="0.05"}'
+        values: '0+1000x80'
+      - series: 'rollcall_gateway_decision_seconds_count{gateway="gw-1"}'
+        values: '0+1000x80'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: SLOBurnRate
+        exp_alerts:
+          - exp_labels: { severity: page, slo: gateway-availability, service: roll-call-gateway, window: 1h }
+            exp_annotations:
+              summary: 'Gateway availability: burning error budget at over 14.4x (2% of the 30 d budget in 1 h).'
+              runbook: docs/slo.md
+          - exp_labels: { severity: ticket, slo: gateway-availability, service: roll-call-gateway, window: 6h }
+            exp_annotations:
+              summary: 'Gateway availability: burning error budget at over 6x (5% of the 30 d budget in 6 h).'
+              runbook: docs/slo.md
+          - exp_labels: { severity: review, slo: gateway-availability, service: roll-call-gateway, window: 3d }
+            exp_annotations:
+              summary: 'Gateway availability: burning error budget at over 1x (budget spent exactly at the rate that exhausts it in 30 d).'
+              runbook: docs/slo.md
+    promql_expr_test:
+      - expr: slo:burn_rate:1h{slo="decision-latency-p99"}
+        eval_time: 70m
+        exp_samples:
+          - { labels: 'slo:burn_rate:1h{slo="decision-latency-p99", service="roll-call-gateway"}', value: 0 }
+  - name: healthy traffic raises no burn alert
+    interval: 1m
+    input_series:
+      - series: 'rollcall_gateway_decisions_total{gateway="gw-1",verdict="allow",code="OK"}'
+        values: '0+1000x80'
+    alert_rule_test:
+      - { eval_time: 70m, alertname: SLOBurnRate, exp_alerts: [] }
+  - name: unregistered agent pages
+    interval: 1m
+    input_series:
+      - series: 'rollcall_control_unregistered_running'
+        values: '0 0 0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: UnregisteredAgentRunning
+        exp_alerts:
+          - exp_labels: { severity: page, service: roll-call-control, slo: unregistered-agents }
+            exp_annotations: { summary: 'An agent is running that is not in the registry.', runbook: docs/slo.md }

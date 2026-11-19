@@ -1,9 +1,9 @@
 # Roll Call — every claim has a target. Offline by default.
 NODE ?= node
-.PHONY: help test acceptance typecheck demo stack drill bench chaos exec-pack verify ui replay compose-up compose-down kind-up admission-demo clean print
+.PHONY: help test acceptance typecheck demo stack drill bench chaos exec-pack verify ui replay compose-up compose-down observe observe-otel slo slo-test k6 kind-up admission-demo clean print
 
 help: ## list targets
-	@grep -E '^[a-z-]+:.*##' Makefile | sed 's/:.*##/ —/'
+	@grep -E '^[a-z0-9-]+:.*##' Makefile | sed 's/:.*##/ —/'
 
 test: ## unit tests
 	npm run -s test
@@ -34,7 +34,18 @@ verify: exec-pack ## chain verify, tamper test, every verification-matrix comman
 compose-up: ## docker compose stack
 	docker compose -f deploy/compose/docker-compose.yml up -d --build
 compose-down:
-	docker compose -f deploy/compose/docker-compose.yml down -v
+	docker compose -f deploy/compose/docker-compose.yml --profile observability --profile otel down -v
+observe: ## compose + Prometheus (:9090) + Grafana (:3000, dashboard "Roll Call — SLOs")
+	docker compose -f deploy/compose/docker-compose.yml --profile observability up -d --build
+observe-otel: ## observe + OTel collector (same targets, remote-write to Prometheus)
+	docker compose -f deploy/compose/docker-compose.yml --profile observability --profile otel up -d --build
+slo: ## slo/*.yaml -> Prometheus rules (deploy/observability/prometheus/rules/slo.rules.yml)
+	$(NODE) scripts/slo-gen.ts
+slo-test: slo ## promtool check + unit test of the burn-rate alerts (docker)
+	docker run --rm --entrypoint promtool -v $(CURDIR)/deploy/observability/prometheus:/p prom/prometheus:v3.5.0 check rules /p/rules/slo.rules.yml /p/rules/invariants.rules.yml
+	docker run --rm --entrypoint promtool -v $(CURDIR)/deploy/observability/prometheus:/p prom/prometheus:v3.5.0 test rules /p/tests/slo.test.yml
+k6: ## 60 s open-model load on a running `make stack` (docker, host network) -> k6/summary.json
+	docker run --rm --network host -v $(CURDIR)/k6:/k6 grafana/k6:1.3.0 run --summary-export /k6/summary.json /k6/gateway.js
 kind-up: ## kind cluster + AgentRecord CRD + admission webhook
 	bash deploy/k8s/kind-up.sh
 admission-demo: ## try to run an unregistered agent in kind

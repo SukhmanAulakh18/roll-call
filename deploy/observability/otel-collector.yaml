@@ -1,0 +1,19 @@
+# Optional OTel path (ADR-009): the collector scrapes the same /metrics targets as Prometheus and remote-writes to it with an
+# extra label via="otel". Prometheus scrape stays the primary path; start with `make observe-otel`. Metrics only: no traces or logs yet.
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: rollcall-control
+          scrape_interval: 15s
+          static_configs: [{ targets: ['control:7100'] }]
+        - job_name: rollcall-gateway
+          scrape_interval: 15s
+          static_configs: [{ targets: ['gateway-1:7200', 'gateway-2:7200'] }]
+exporters:
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    external_labels: { via: otel }
+service:
+  pipelines:
+    metrics: { receivers: [prometheus], exporters: [prometheusremotewrite] }

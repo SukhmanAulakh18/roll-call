@@ -1,0 +1,26 @@
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: gateway-availability
+  displayName: Gateway availability
+spec:
+  service: roll-call-gateway
+  description: 'A decision is good unless the gateway answered 502 TOOL_ERROR. Deny and throttle are correct answers, not failures. A gateway that is down emits nothing: see GatewayDown in invariants.rules.yml.'
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 30d
+      isRolling: true
+  objectives:
+    - displayName: Gateway availability
+      target: 0.9995
+      ratioMetrics:
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_gateway_decisions_total{code!="TOOL_ERROR"}[$window]))'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_gateway_decisions_total[$window]))'

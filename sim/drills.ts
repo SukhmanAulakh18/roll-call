@@ -2,6 +2,7 @@ import type { DrillResult, IncidentStage } from '../contracts/types.ts';
 import type { ControlHandle } from '../services/control/src/app.ts';
 import type { DrillMode, FaultKind, FleetControl } from '../services/control/src/runtime.ts';
 import { sleep } from '../services/lib/http.ts';
+import { POLICY } from '../services/control/src/lifecycle.ts';
 
 export interface DrillEnv { control: ControlHandle; fleet: FleetControl }
 export interface DrillOpts { warmupMs?: number; windowMs?: number }
@@ -45,5 +46,32 @@ export async function runDrill(env: DrillEnv, name: string, mode: DrillMode, o: 
     detected: stages.detected !== undefined,
     hardContained: d.positive ? hard(d.agentId) : hard(d.agentId) || others.some(hard),
     collateralIncidents: others.length ? others : undefined,
+  };
+}
+
+/** Release drills: a new version of invoice-recon runs as a canary. bad-release ships a regression (every 3rd call is malformed); good-release is the control case. */
+export const RELEASE_DRILLS: Record<string, { agentId: string; fault?: 'errors' }> = {
+  'bad-release': { agentId: 'invoice-recon', fault: 'errors' },
+  'good-release': { agentId: 'invoice-recon' },
+};
+
+/** t0 = the moment the new version starts taking traffic (the fault starts there in bad-release). Runs until control settles the release or the deadline passes. */
+export async function runReleaseDrill(env: DrillEnv, name: string, o: DrillOpts = {}): Promise<DrillResult> {
+  const d = RELEASE_DRILLS[name]; if (!d) throw new Error(`unknown release drill '${name}'`);
+  await env.control.reset();
+  await sleep(o.warmupMs ?? WARMUP_MS);
+  const rel = await env.control.releases.start(d.agentId, { fault: d.fault });
+  const t0 = rel.startedAt, deadline = t0 + (o.windowMs ?? 4 * POLICY.canaryWindowMs);
+  while (rel.state === 'canary' && Date.now() < deadline) await sleep(50);
+  await sleep(800);                                              // let gateways flush their last event batches
+  const end = rel.endedAt ?? Date.now();
+  const stages: Partial<Record<IncidentStage, number>> = {};
+  for (const e of env.control.releases.log) if (e.incidentId === rel.id && stages[e.stage] === undefined) stages[e.stage] = e.ts - t0;
+  const evs = [rel.agentId, rel.variantId].flatMap(id => env.control.engine.eventsBetween(t0, end + 800, id));
+  return {
+    drill: name, mode: 'governed', agentId: d.agentId, startedAt: t0, durationMs: end - t0,
+    spendUsd: Math.round(evs.reduce((s, e) => s + e.costUsd, 0) * 1e6) / 1e6, calls: evs.length,
+    stages, timeToContainMs: null, detected: stages.detected !== undefined, hardContained: false,
+    outcome: rel.state === 'canary' ? 'undecided' : rel.state, timeToRollbackMs: stages.rolled_back ?? null, gates: rel.result?.checks,
   };
 }

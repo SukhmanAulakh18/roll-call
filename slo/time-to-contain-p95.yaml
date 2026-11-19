@@ -1,0 +1,26 @@
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: time-to-contain-p95
+  displayName: Time to contain p95 within 30 s
+spec:
+  service: roll-call-control
+  description: '95% of contained incidents reach an independent proof within 30 s of detection, which is p95 <= 30 s. Includes the simulated owner acknowledgement. Low volume: the burn alerts only evaluate while incidents occur.'
+  budgetingMethod: Occurrences
+  timeWindow:
+    - duration: 30d
+      isRolling: true
+  objectives:
+    - displayName: Time to contain p95 within 30 s
+      target: 0.95
+      ratioMetrics:
+        good:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_control_time_to_contain_seconds_bucket{le="30"}[$window]))'
+        total:
+          metricSource:
+            type: Prometheus
+            spec:
+              query: 'sum(rate(rollcall_control_time_to_contain_seconds_count[$window]))'

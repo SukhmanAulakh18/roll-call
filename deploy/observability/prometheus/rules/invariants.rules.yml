@@ -1,0 +1,19 @@
+# Hand-written alerts for SLOs whose target is "always": burn-rate maths cannot express zero tolerance.
+groups:
+  - name: rollcall-invariants
+    rules:
+      - alert: GatewayDown
+        expr: up{job="rollcall-gateway"} == 0
+        for: 1m
+        labels: { severity: page, service: roll-call-gateway }
+        annotations: { summary: 'Gateway {{ $labels.instance }} is not scraping. A dead gateway emits no decisions, so the availability SLO cannot see it.', runbook: docs/slo.md }
+      - alert: UnregisteredAgentRunning
+        expr: max(rollcall_control_unregistered_running) > 0
+        for: 1m
+        labels: { severity: page, service: roll-call-control, slo: unregistered-agents }
+        annotations: { summary: 'An agent is running that is not in the registry.', runbook: docs/slo.md }
+      - alert: ReceiptGap
+        expr: sum(increase(rollcall_gateway_decisions_total[5m])) - sum(increase(rollcall_gateway_receipts_total[5m])) > 0
+        for: 5m
+        labels: { severity: page, service: roll-call-gateway, slo: receipt-completeness }
+        annotations: { summary: 'Decisions were made without a receipt appended.', runbook: docs/slo.md }
