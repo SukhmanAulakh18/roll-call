@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "impact.json — every number the UI and docs show. Written only by real runs.",
   "type": "object",
-  "required": ["generatedAt", "gitSha", "fleet", "drill", "detector", "assumptions"],
+  "required": ["generatedAt", "gitSha", "fleet", "drill", "detector", "bench", "chaos", "assumptions"],
   "properties": {
     "generatedAt": {"type": "string"},
     "gitSha": {"type": "string"},
@@ -22,7 +22,7 @@
     },
     "detector": {"type": "object", "required": ["tp", "fp", "fn", "tn", "precision", "recall", "cases"]},
     "bench": {"type": "object", "required": ["governed", "direct", "overheadP99Ms", "throughputRps", "command"]},
-    "chaos": {"type": "object"},
+    "chaos": {"type": "object", "required": ["command", "scenarios", "runAt"]},
     "assumptions": {"type": "object", "description": "Every value here is an ASSUMPTION and must be labeled so in the UI", "required": ["pricesUsdPerCall"]}
   }
 }

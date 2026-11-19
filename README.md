@@ -53,8 +53,9 @@ To run the containers instead: `make compose-up`, then `make compose-down` to st
 | `make demo` | Build the UI and serve the offline demo on port 7100 |
 | `make drill` | At least 20 governed and ungoverned runaway drills, and the detector set; writes `impact.json` |
 | `make bench` | Decision-path latency against the ungoverned baseline; writes `impact.json` |
-| `make chaos` | Game days: control-plane stop, identity issuer stop, gateway loss; writes `impact.json` |
-| `make verify` | Chain verification, tamper test and every verification-matrix command |
+| `make chaos` | Five game days (control stop, issuer down, gateway loss, bad bundle, event backlog); writes the `chaos` section of `impact.json` |
+| `make exec-pack` | Render `exec-pack/` (briefs, verification matrix, threat model, E-23 mapping) from `impact.json` |
+| `make verify` | Runs `exec-pack` first, then chain verification, tamper test, every verification-matrix command, schema check and forbidden-strings scan |
 | `make replay` | Build the static Replay page from the last recorded run |
 | `make compose-up` / `make compose-down` | Docker compose stack, up and down |
 | `make kind-up` | kind cluster with the AgentRecord CRD and admission webhook (planned) |

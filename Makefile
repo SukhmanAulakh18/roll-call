@@ -1,6 +1,6 @@
 # Roll Call — every claim has a target. Offline by default.
 NODE ?= node
-.PHONY: help test acceptance typecheck demo stack drill bench chaos verify ui replay compose-up compose-down kind-up admission-demo clean
+.PHONY: help test acceptance typecheck demo stack drill bench chaos exec-pack verify ui replay compose-up compose-down kind-up admission-demo clean
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*##' Makefile | sed 's/:.*##/ —/'
@@ -24,9 +24,11 @@ drill: ## >=20 A/B runaway drills + detector set -> impact.json
 	$(NODE) scripts/drill.ts --runs 20
 bench: ## decision-path latency vs ungoverned -> impact.json
 	$(NODE) scripts/bench.ts
-chaos: ## game days: control-plane stop, issuer stop, gateway loss -> impact.json
+chaos: ## 5 game days: control stop, issuer down, gateway loss, bad bundle, event backlog -> impact.json
 	$(NODE) scripts/chaos.ts
-verify: ## chain verify, tamper test, every verification-matrix command
+exec-pack: ## render exec-pack/ from impact.json (no hand-typed numbers)
+	$(NODE) scripts/exec-pack.ts
+verify: exec-pack ## chain verify, tamper test, every verification-matrix command, schema, forbidden strings
 	$(NODE) scripts/verify.ts
 
 compose-up: ## docker compose stack
