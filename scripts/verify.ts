@@ -1,7 +1,7 @@
 // make verify: receipt chains from a fresh run, tamper test, every verification-matrix check, impact.json schema,
 // exec-pack numbers vs impact.json, and a forbidden-strings scan. Non-zero exit on any failure.
 import { execSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { verifyChain } from '../services/gateway/src/receipts.ts';
@@ -77,7 +77,7 @@ add('5 numbers', `${allClaims(impact).length} claims vs briefs and impact.json`,
 // ---- 6. forbidden strings (built from parts so this file does not match itself)
 const words = [['cl', 'aude'], ['anthro', 'pic'], ['vi', 'sa'], ['immigr', 'ation']].map(p => p.join(''));
 const re = new RegExp(words.join('|'), 'i');
-const tracked = execSync('git ls-files -co --exclude-standard', { encoding: 'utf8', maxBuffer: 64e6 }).split('\n').filter(f => f && existsSync(f)
+const tracked = execSync('git ls-files -co --exclude-standard', { encoding: 'utf8', maxBuffer: 64e6 }).split('\n').filter(f => f && existsSync(f) && lstatSync(f).isFile()
   && !/(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|.*\.lock)$/.test(f) && !/\.(png|jpe?g|gif|ico|woff2?|ttf|pdf|zip)$/i.test(f) && !f.startsWith('node_modules/') && !f.startsWith('ui/dist/'));
 const hits: string[] = [];
 for (const f of tracked) { const lines = readFileSync(f, 'utf8').split('\n'); lines.forEach((l, i) => { if (re.test(l)) hits.push(`${f}:${i + 1}`); }); }
