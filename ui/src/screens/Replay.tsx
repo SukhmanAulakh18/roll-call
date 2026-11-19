@@ -1,31 +1,56 @@
-import { replayPause, replayPlay, replayRestart, replaySpeed, useStore } from '../store';
-import { clock, groupIncidents } from '../ui';
+import { useEffect, useState } from 'react';
+import { Pause, Play, RotateCcw, SkipBack } from 'lucide-react';
+import { FIXTURE, replayPause, replayPlay, replayRestart, replaySeek, replaySpeed, useStore } from '../store';
+import { FixtureChip, Initials, StateMark, clock, ownerShort, type AgentState } from '../ui';
+import { Panel } from '../components';
 import { FleetMap } from './FleetMap';
-import { Heroes, IncidentBanner } from './Home';
+import { Ticker } from './Fleet';
+
+const useWide = () => {
+  const [w, setW] = useState(() => matchMedia('(min-width: 1000px)').matches);
+  useEffect(() => { const m = matchMedia('(min-width: 1000px)'); const f = () => setW(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
+  return w;
+};
+const fmt = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export function Replay() {
   const r = useStore((s) => s.replay);
-  const impact = useStore((s) => s.impact);
   const incidents = useStore((s) => s.incidents);
+  const agents = useStore((s) => s.agents);
+  const states = useStore((s) => s.fleet?.states);
   const n = useStore((s) => s.actions.length);
-  if (r.status === 'empty') return <section className="panel"><h1 className="h-display text-4xl">No recording yet</h1><p className="mt-2 text-mute">Nothing at <code className="font-mono">/replay/events.json</code>. Record a run with <code className="font-mono text-ink">make replay</code>.</p></section>;
+  const wide = useWide();
+  if (r.status === 'empty') return <section className="panel"><h1>No recording yet</h1><p className="muted">Nothing at <code className="measured">/replay/events.json</code>. Record a run with <code className="measured">make replay</code>.</p></section>;
+  const pct = Math.round(r.pos * 100);
+  const label = r.status === 'loading' ? 'Loading' : r.status === 'done' ? 'Finished' : r.status === 'paused' ? 'Paused' : 'Playing';
   return (
-    <div className="space-y-8">
-      <div><h1 className="h-display text-5xl">Replay</h1><p className="mt-1 text-mute">A recorded run played back in your browser. No backend needed; nothing here is live.</p></div>
-      <div className="panel flex flex-wrap items-center gap-4">
-        {r.status === 'playing' ? <button className="btn" onClick={replayPause}>Pause</button> : <button className="btn btn-accent" onClick={replayPlay} disabled={r.status === 'loading'}>{r.status === 'done' ? 'Play again' : 'Play'}</button>}
-        <button className="btn" onClick={replayRestart} disabled={r.status === 'loading'}>Restart</button>
-        <label className="flex items-center gap-2">Speed <select className="field" value={r.speed} onChange={(e) => replaySpeed(Number(e.target.value))}>{[1, 4, 16].map((s) => <option key={s} value={s}>{s}×</option>)}</select></label>
-        <div className="min-w-[200px] flex-1"><progress className="h-3 w-full" max={1} value={r.pos} aria-label="Replay progress" /></div>
-        <span className="text-mute" role="status">{r.status === 'loading' ? 'Loading…' : r.status === 'done' ? 'Finished' : r.status === 'paused' ? 'Paused' : 'Playing'} · {n} actions</span>
-      </div>
-      <IncidentBanner />
-      {impact && <Heroes />}
-      <FleetMap />
-      <section className="panel" aria-labelledby="rl"><h2 id="rl" className="h-display text-2xl">Incident log</h2>
-        {incidents.length ? <ul className="mt-3 space-y-1">{[...incidents].reverse().slice(0, 10).map((e) => <li key={e.incidentId + e.stage}><span className="font-mono text-sm">{clock(e.ts)}</span> · <strong>{e.stage.replace('_', ' ')}</strong> · {e.agentId}: {e.message}</li>)}</ul> : <p className="mt-3 text-mute">No incidents yet in this recording.</p>}
-        <p className="sr-only">{groupIncidents(incidents).length} incidents</p>
+    <div className="replay">
+      <header className="page-h"><div><h1>Replay</h1><p className="lead">A recorded run played back in your browser. No backend needed. Nothing here is live.</p></div>{FIXTURE && <FixtureChip />}</header>
+      <section className="transport" aria-label="Replay controls">
+        <div className="transport-row">
+          {r.status === 'playing' ? <button className="btn btn--primary btn--lg" onClick={replayPause}><Pause size={18} aria-hidden />Pause</button> : <button className="btn btn--primary btn--lg" onClick={r.status === 'done' ? replayRestart : replayPlay} disabled={r.status === 'loading'}>{r.status === 'done' ? <RotateCcw size={18} aria-hidden /> : <Play size={18} aria-hidden />}{r.status === 'done' ? 'Play again' : 'Play'}</button>}
+          <button className="btn btn--lg btn--icon" onClick={() => replaySeek(0)} aria-label="Back to start" disabled={r.status === 'loading'}><SkipBack size={18} aria-hidden /></button>
+          <div className="seg" role="group" aria-label="Playback speed">{[1, 4, 16].map((s) => <button key={s} aria-pressed={r.speed === s} onClick={() => replaySpeed(s)}>{s}x</button>)}</div>
+          <span className="measured transport-t" role="status">{label}, {fmt(r.pos * r.spanMs)} of {fmt(r.spanMs)}, {n} actions</span>
+        </div>
+        <div className="scrub">
+          <input type="range" min={0} max={1000} value={Math.round(r.pos * 1000)} onChange={(e) => replaySeek(Number(e.target.value) / 1000)} aria-label="Scrub the recording" aria-valuetext={`${pct} percent, ${fmt(r.pos * r.spanMs)}`} style={{ ['--p' as string]: `${r.pos * 100}%` }} />
+          <div className="scrub-marks" aria-hidden="true">{r.marks.map((m, i) => <i key={i} className={`mk mk-${m.stage}`} style={{ left: `${m.pos * 100}%` }} title={`${m.stage} ${m.agentId}`} />)}</div>
+        </div>
+        <p className="muted scrub-legend">Ticks on the track are incident stages: detect, throttle, page, kill, proof.</p>
       </section>
+
+      {wide ? <Panel title="Fleet at this moment" id="rm-h"><div className="map-frame map-frame--s"><FleetMap selected={null} onSelect={() => undefined} /></div></Panel> : (
+        <Panel title="Fleet at this moment" id="rg-h">
+          <ul className="agrid">{agents.map((a) => <li key={a.id}><span className="agrid-n"><Initials name={a.owner.name} size={22} />{a.name}</span><StateMark state={(states?.[a.id] ?? 'unknown') as AgentState} /></li>)}</ul>
+        </Panel>
+      )}
+
+      <Panel title="Incident log" id="il-h">
+        {incidents.length ? <ol className="ilog">{[...incidents].reverse().slice(0, 12).map((e) => <li key={e.incidentId + e.stage}><span className="measured">{clock(e.ts)}</span><strong>{e.stage.replace('_', ' ')}</strong><span>{agents.find((a) => a.id === e.agentId)?.name ?? e.agentId}</span><span className="muted">{e.message}{e.proof ? ` Probe: ${e.proof.verdict} ${e.proof.code}, receipt ${e.proof.receiptId}.` : ''}</span></li>)}</ol> : <p className="empty">No incidents yet at this point in the recording.</p>}
+        <p className="visually-hidden">Owners: {agents.map((a) => ownerShort(a.owner.name)).join(', ')}</p>
+      </Panel>
+      <Ticker className="ticker--wide" />
     </div>
   );
 }

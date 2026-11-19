@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { ActionEvent, AdmissionResult, AgentRecord, DrillResult, FleetSummary, IncidentEvent, StreamMessage } from '../../contracts/types';
 import { FIXTURE_IMPACT } from './fixtures/FIXTURE_impact';
 import { FIXTURE_AGENTS } from './fixtures/FIXTURE_agents';
-import { fixtureBaseline, fixtureDrill } from './fixtures/FIXTURE_stream';
+import { chainAction, fixtureBaseline, fixtureDrill, fixtureFleet, fixtureProbe, startFixtureSim, verifyFixtureChain } from './fixtures/FIXTURE_stream';
 
 export const FIXTURE = new URLSearchParams(location.search).get('fixture') === '1';
 export type Impact = Record<string, any>;
@@ -12,14 +12,14 @@ export interface DrillRun { name: string; ab: boolean; phase: 'ungoverned' | 'go
 export interface S {
   source: Source; impact: Impact | null; impactErr: boolean; agents: AgentRecord[]; fleet: FleetSummary | null;
   actions: ActionEvent[]; incidents: IncidentEvent[]; admissions: (AdmissionResult & { workload: string; ts: number })[];
-  totals: Totals; connected: boolean; updatedAt: number | null; drillRun: DrillRun | null;
-  replay: { status: 'loading' | 'playing' | 'paused' | 'done' | 'empty'; pos: number; speed: number };
+  totals: Totals; spendHist: Record<string, number[]>; fleetHist: { t: number; total: number }[]; connected: boolean; updatedAt: number | null; drillRun: DrillRun | null;
+  replay: { status: 'loading' | 'playing' | 'paused' | 'done' | 'empty'; pos: number; speed: number; marks: { pos: number; stage: string; agentId: string }[]; startTs: number; spanMs: number };
 }
 
 const emptyTotals = (): Totals => ({ cost: {}, costTool: {}, callsTool: {}, tasks: {}, first: null, last: null });
 const initial = (source: Source): S => ({
-  source, impact: null, impactErr: false, agents: [], fleet: null, actions: [], incidents: [], admissions: [], totals: emptyTotals(),
-  connected: false, updatedAt: null, drillRun: null, replay: { status: 'loading', pos: 0, speed: 4 },
+  source, impact: null, impactErr: false, agents: [], fleet: null, actions: [], incidents: [], admissions: [], totals: emptyTotals(), spendHist: {}, fleetHist: [],
+  connected: false, updatedAt: null, drillRun: null, replay: { status: 'loading', pos: 0, speed: 4, marks: [], startTs: 0, spanMs: 0 },
 });
 
 let state: S = initial(FIXTURE ? 'fixture' : 'live');
@@ -32,6 +32,7 @@ export const getState = () => state;
 let buf: StreamMessage[] = [];
 let flushT: ReturnType<typeof setTimeout> | undefined;
 export function ingest(m: StreamMessage) {
+  if (FIXTURE && m.type === 'action') chainAction(m.data);
   buf.push(m);
   flushT ??= setTimeout(flush, 150);
 }
@@ -41,7 +42,7 @@ function flush() {
   if (!msgs.length) return;
   set((s) => {
     const p: Partial<S> = { updatedAt: Date.now() };
-    let actions = s.actions, incidents = s.incidents, admissions = s.admissions, totals = s.totals;
+    let actions = s.actions, incidents = s.incidents, admissions = s.admissions, totals = s.totals, spendHist = s.spendHist, fleetHist = s.fleetHist;
     for (const m of msgs) {
       if (m.type === 'action') {
         const a = m.data;
@@ -56,10 +57,15 @@ function flush() {
         }
       } else if (m.type === 'incident') {
         if (!incidents.some((i) => i.incidentId === m.data.incidentId && i.stage === m.data.stage)) incidents = [...incidents, m.data].slice(-300);
-      } else if (m.type === 'fleet') p.fleet = m.data;
+      } else if (m.type === 'fleet') {
+        p.fleet = m.data;
+        spendHist = { ...spendHist };
+        for (const [id, v] of Object.entries(m.data.spendPerMinUsd ?? {})) spendHist[id] = [...(spendHist[id] ?? []).slice(-59), v];
+        fleetHist = [...fleetHist.slice(-119), { t: msgTs(m) ?? Date.now(), total: Object.values(m.data.spendPerMinUsd ?? {}).reduce((a, b) => a + b, 0) }];
+      }
       else if (m.type === 'admission') admissions = [m.data, ...admissions].slice(0, 50);
     }
-    return { ...p, actions, incidents, admissions, totals };
+    return { ...p, actions, incidents, admissions, totals, spendHist, fleetHist };
   });
 }
 
@@ -72,9 +78,10 @@ const postJSON = async (url: string, body?: unknown): Promise<any> => {
   return j;
 };
 let es: EventSource | null = null;
+let stopSim: (() => void) | undefined;
 let timers: ReturnType<typeof setTimeout>[] = [];
 let replayTimer: ReturnType<typeof setInterval> | undefined;
-const teardown = () => { es?.close(); es = null; timers.forEach(clearTimeout); timers = []; clearInterval(replayTimer); clearTimeout(flushT); flushT = undefined; buf = []; };
+const teardown = () => { stopSim?.(); stopSim = undefined; es?.close(); es = null; timers.forEach(clearTimeout); timers = []; clearInterval(replayTimer); clearTimeout(flushT); flushT = undefined; buf = []; };
 const msgTs = (m: StreamMessage): number | undefined => (m as any).ts ?? (m.data as any)?.ts;
 
 export async function refreshImpact() {
@@ -93,7 +100,7 @@ export async function start(mode: 'live' | 'replay') {
   set(initial(mode === 'replay' ? 'replay' : FIXTURE ? 'fixture' : 'live'));
   if (mode === 'replay') return startReplay();
   void refreshImpact(); void loadAgents(['/v1/agents']);
-  if (FIXTURE) { fixtureBaseline(Date.now()).forEach(ingest); set({ connected: true }); return; }
+  if (FIXTURE) { fixtureBaseline(Date.now()).forEach(ingest); set({ connected: true }); stopSim = startFixtureSim(ingest, () => state.actions, () => state.fleet); return; }
   void getJSON('/v1/incidents').then((l) => Array.isArray(l) && l.forEach((data: IncidentEvent) => ingest({ type: 'incident', data })));
   es = new EventSource('/v1/stream');
   es.onopen = () => set({ connected: true });
@@ -118,7 +125,22 @@ async function startReplay() {
     const idsSeen = [...new Set(items.flatMap(({ m }) => (m.type === 'action' || m.type === 'incident' ? [m.data.agentId] : [])))];
     set({ agents: idsSeen.map((id) => ({ id, name: id, purpose: 'Not in the recording', owner: { name: 'unknown', team: 'unknown', escalation: '' }, riskRating: 'low', lifecycleState: 'production', scopes: { tools: [], data: [] }, models: [], residency: 'unknown', evaluation: null } as unknown as AgentRecord)) });
   }
+  const span = items[items.length - 1].at - items[0].at || 1;
+  set({ replay: { ...state.replay, startTs: items[0].at, spanMs: span, marks: items.flatMap(({ at, m }) => (m.type === 'incident' ? [{ pos: (at - items[0].at) / span, stage: m.data.stage, agentId: m.data.agentId }] : [])) } });
   replayRestart();
+}
+export function replaySeek(frac: number) {
+  if (!items.length) return;
+  const was = state.replay.status === 'playing';
+  clearInterval(replayTimer);
+  const span = items[items.length - 1].at - items[0].at || 1;
+  vt = items[0].at + frac * span; idx = 0;
+  clearTimeout(flushT); flushT = undefined; buf = [];
+  set({ actions: [], incidents: [], fleet: null, totals: emptyTotals(), admissions: [], spendHist: {}, fleetHist: [] });
+  while (idx < items.length && items[idx].at <= vt) ingest(items[idx++].m);
+  flush();
+  set({ replay: { ...state.replay, pos: frac, status: idx >= items.length ? 'done' : was ? 'playing' : 'paused' } });
+  if (was && idx < items.length) replayTimer = setInterval(tick, 100);
 }
 function tick() {
   const s = state.replay.speed;
@@ -133,7 +155,7 @@ export function replayPause() { clearInterval(replayTimer); set({ replay: { ...s
 export function replaySpeed(speed: number) { set({ replay: { ...state.replay, speed } }); }
 export function replayRestart() {
   clearInterval(replayTimer); idx = 0; vt = items[0].at - 1;
-  set({ actions: [], incidents: [], fleet: null, totals: emptyTotals(), admissions: [] });
+  set({ actions: [], incidents: [], fleet: null, totals: emptyTotals(), admissions: [], spendHist: {}, fleetHist: [] });
   replayPlay();
 }
 
@@ -167,16 +189,20 @@ export async function resetDrills() {
   if (!FIXTURE) { try { await postJSON('/v1/reset'); } catch (e) { note = `The server did not confirm a reset (${(e as Error).message}).`; } }
   timers.forEach(clearTimeout); timers = [];
   set({ drillRun: note ? { name: '', ab: false, phase: 'error', starts: {}, results: [], error: note } : null, incidents: [], actions: state.actions.filter((a) => !a.agentId.startsWith('__')) });
-  if (FIXTURE) ingest({ type: 'fleet', data: (fixtureBaseline(Date.now())[0] as { type: 'fleet'; data: FleetSummary }).data });
+  if (FIXTURE) { stopSim?.(); ingest(fixtureFleet()); stopSim = startFixtureSim(ingest, () => state.actions, () => state.fleet); }
 }
 
 export async function killAgent(id: string): Promise<IncidentEvent> {
   if (FIXTURE) {
     const t = Date.now();
-    const proof = { attemptedTool: 'ledger.read', verdict: 'deny' as const, code: 'REVOKED', receiptId: 'gw-1:123' };
-    const ev: IncidentEvent = { incidentId: `inc-fixture-kill-${id}`, agentId: id, stage: 'proof', ts: t, message: `Probe tried ledger.read as ${id}: denied (REVOKED).`, proof };
-    ingest({ type: 'incident', data: { ...ev, stage: 'killed', message: 'Identity revoked.' } }); ingest({ type: 'incident', data: ev });
-    ingest({ type: 'fleet', data: { ...(state.fleet as FleetSummary), states: { ...state.fleet!.states, [id]: 'killed' }, spendPerMinUsd: { ...state.fleet!.spendPerMinUsd, [id]: 0 } } });
+    const tool = state.agents.find((x) => x.id === id)?.scopes.tools.find((x) => x !== 'agent.call') ?? 'ledger.read';
+    const probe = fixtureProbe(id, tool, t + 50);
+    const proof = { attemptedTool: tool, verdict: 'deny' as const, code: 'REVOKED', receiptId: probe.receiptId };
+    const ev: IncidentEvent = { incidentId: `inc-fixture-kill-${id}-${t}`, agentId: id, stage: 'proof', ts: t + 50, message: `Probe tried ${tool} as ${id}: denied (REVOKED).`, proof };
+    await sleep(500);
+    ingest({ type: 'incident', data: { ...ev, stage: 'killed', ts: t, message: 'Identity revoked by a person.' } });
+    ingest({ type: 'action', data: probe }); ingest({ type: 'incident', data: ev });
+    ingest(fixtureFleet({ ...(state.fleet?.states ?? {}), [id]: 'killed' }, state.fleet?.spendPerMinUsd ?? {}, t) as StreamMessage);
     return ev;
   }
   const ev: IncidentEvent = await postJSON(`/v1/agents/${encodeURIComponent(id)}/kill`);
@@ -184,17 +210,35 @@ export async function killAgent(id: string): Promise<IncidentEvent> {
   return ev;
 }
 
+const FX_EXTRA: Record<string, { lifecycleState: string; evaluation: null }> = {};
+/** Mirrors services/control/src/admission.ts so the fixture playground behaves like the real gate. */
 export async function reviewAdmission(workload: { name: string; namespace: string; labels: Record<string, string> }): Promise<AdmissionResult> {
   if (FIXTURE) {
-    const a = state.agents.find((x) => x.id === workload.labels['rollcall.dev/agent-id']);
-    return !workload.labels['rollcall.dev/agent-id'] ? { allowed: false, code: 'NO_LABEL', reason: 'FIXTURE: this workload has no agent-id label, so nobody owns it.' }
-      : !a ? { allowed: false, code: 'NO_RECORD', reason: 'FIXTURE: no registry record matches this agent id.' } : { allowed: true, code: 'OK', reason: 'FIXTURE: registered, owned and approved.' };
+    await sleep(350);
+    const id = workload.labels['rollcall.dev/agent-id'];
+    const r: any = id ? (state.agents.find((x) => x.id === id) ?? FX_EXTRA[id]) : undefined;
+    const deny = (code: string, reason: string): AdmissionResult => ({ allowed: false, code, reason });
+    if (!id) return deny('NO_LABEL', `Workload '${workload.name}' carries no rollcall.dev/agent-id label, so it is not a registered agent. Register it in Roll Call first, then label the workload. (FIXTURE answer)`);
+    if (!r) return deny('NOT_REGISTERED', `No agent record '${id}' exists. Register the agent before deploying workload '${workload.name}'. (FIXTURE answer)`);
+    if ((r.lifecycleState === 'production' || r.lifecycleState === 'canary') && !r.evaluation?.passed) return deny('NO_PASSING_EVAL', `Agent '${id}' is in ${r.lifecycleState} but has no passing evaluation on record. Attach passing evidence or move it back to shadow. (FIXTURE answer)`);
+    return { allowed: true, code: 'OK', reason: `Agent '${id}' is registered, owned by ${r.owner?.name}, lifecycle ${r.lifecycleState}. (FIXTURE answer)` };
   }
   return postJSON('/v1/admission/review', { workload });
 }
 
+/** POST /v1/agents applies the same validation as admission; used by the "production without evaluation" preset. */
+export async function registerDraft(rec: Partial<AgentRecord> & { id: string }): Promise<AdmissionResult> {
+  if (FIXTURE) { await sleep(350); return { allowed: false, code: 'NO_PASSING_EVAL', reason: `Agent '${rec.id}' is in ${rec.lifecycleState} but has no passing evaluation on record. Attach passing evidence or move it back to shadow. (FIXTURE answer)` }; }
+  try {
+    const r = await fetch('/v1/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rec) });
+    const j = await r.json().catch(() => null);
+    if (r.ok) return { allowed: true, code: 'OK', reason: `Registered ${rec.id}.` };
+    return { allowed: false, code: j?.code ?? `HTTP_${r.status}`, reason: j?.reason ?? j?.error ?? `The registry refused the record (HTTP ${r.status}).` };
+  } catch (e) { throw new Error((e as Error).message); }
+}
+
 export async function verifyReceipts(): Promise<{ gateway: string; ok: boolean; count?: number; reason?: string }[]> {
-  if (FIXTURE) return [{ gateway: 'gw-1 (FIXTURE)', ok: true, count: 0 }];
+  if (FIXTURE) { await sleep(450); const v = verifyFixtureChain(); return [{ gateway: 'gw-1 (FIXTURE chain, in-browser)', ok: v.ok, count: v.count }]; }
   const j = await getJSON('/v1/receipts/verify');
   if (!j) throw new Error('Could not reach /v1/receipts/verify');
   const list = Array.isArray(j) ? j : Object.entries(j.gateways ?? j).map(([gateway, v]) => ({ gateway, ...(v as object) }));

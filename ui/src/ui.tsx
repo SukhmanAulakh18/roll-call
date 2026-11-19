@@ -1,41 +1,90 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { IncidentEvent, IncidentStage } from '../../contracts/types';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import * as Tooltip from '@radix-ui/react-tooltip';
+import { animate, useReducedMotion } from 'motion/react';
+import { BadgeCheck, CircleDashed, OctagonX, PauseCircle, ShieldCheck, TriangleAlert, X } from 'lucide-react';
+import type { ActionEvent, IncidentEvent, IncidentStage } from '../../contracts/types';
 import { useStore } from './store';
+import { setUi, useUi } from './ui-state';
 
 export const usd = (n: number, max = 2) => `$${n.toLocaleString('en-US', { maximumFractionDigits: max, minimumFractionDigits: n !== 0 && Math.abs(n) < 1 ? Math.min(2, max) : 0 })}`;
 export const secs = (ms: number) => `${(ms / 1000).toLocaleString('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} s`;
 export const clock = (ts: number) => new Date(ts).toLocaleTimeString([], { hour12: false });
 export const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 export const get = (o: any, path: string): any => path.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
+export const initials = (name: string) => name.replace(/\(.*\)/, '').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+export const ownerShort = (name: string) => name.replace(/\s*\(.*\)/, '');
 
 export function useLocal<T>(key: string, init: T): [T, (v: T) => void] {
   const [v, setV] = useState<T>(() => { try { const s = localStorage.getItem('rc.' + key); return s == null ? init : (JSON.parse(s) as T); } catch { return init; } });
   return [v, (n) => { setV(n); try { localStorage.setItem('rc.' + key, JSON.stringify(n)); } catch { /* storage unavailable */ } }];
 }
+export function useNow(ms = 1000) {
+  const [n, setN] = useState(() => Date.now());
+  useEffect(() => { const h = setInterval(() => setN(Date.now()), ms); return () => clearInterval(h); }, [ms]);
+  return n;
+}
 
 export const NotMeasured = ({ cmd }: { cmd: string }) => (
-  <span className="text-mute italic">not measured yet <span className="not-italic">— run <code className="font-mono text-ink">{cmd}</code></span></span>
+  <span className="not-measured">not measured yet, run <code className="measured">{cmd}</code></span>
 );
-export const Assumption = ({ children = 'ASSUMPTION' }: { children?: ReactNode }) => <span className="chip chip-assume" title="A number someone typed in, not something we measured">{children}</span>;
-export const Measured = () => <span className="chip" title="Computed from a real run of the simulated fleet">measured</span>;
+export const Assumption = ({ children = 'ASSUMPTION' }: { children?: ReactNode }) => <span className="chip chip--assume" title="A number someone typed in, not something we measured">{children}</span>;
+export const Measured = () => <span className="chip chip--cool" title="Computed from a real run of the simulated fleet">measured</span>;
+export const FixtureChip = () => <span className="chip chip--fixture" title="Invented placeholder data for development. Never a real run.">FIXTURE DATA</span>;
 
-// ---------- state marks: icon + text, never color alone ----------
+// ---------- tooltip ----------
+export const TipProvider = ({ children }: { children: ReactNode }) => <Tooltip.Provider delayDuration={250}>{children}</Tooltip.Provider>;
+export function Tip({ label, children, side = 'top' }: { label: ReactNode; children: ReactNode; side?: 'top' | 'bottom' | 'left' | 'right' }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      <Tooltip.Portal><Tooltip.Content className="tip" side={side} sideOffset={6}>{label}</Tooltip.Content></Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
+
+// ---------- state marks: icon + text, never colour alone ----------
 export type AgentState = 'healthy' | 'alert' | 'throttled' | 'killed' | 'unknown';
-const STATE: Record<AgentState, { label: string; path: ReactNode }> = {
-  healthy: { label: 'Healthy', path: <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.5" /></> },
-  alert: { label: 'Needs attention', path: <><path d="M12 3.5l9.5 16.5h-19z" /><path d="M12 10v4.5M12 17.4v.1" /></> },
-  throttled: { label: 'Slowed down', path: <><circle cx="12" cy="12" r="9" /><path d="M9.5 8.5v7M14.5 8.5v7" /></> },
-  killed: { label: 'Stopped', path: <><circle cx="12" cy="12" r="9" /><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" /></> },
-  unknown: { label: 'No data yet', path: <circle cx="12" cy="12" r="9" strokeDasharray="3 3" /> },
+const LABEL: Record<AgentState, string> = { healthy: 'Healthy', alert: 'Needs attention', throttled: 'Slowed down', killed: 'Stopped', unknown: 'No data yet' };
+export const stateLabel = (s: AgentState) => LABEL[s];
+export const StateIcon = ({ state, size = 16 }: { state: AgentState; size?: number }) => {
+  const P = { size, 'aria-hidden': true, strokeWidth: 2.2 } as const;
+  return state === 'healthy' ? <ShieldCheck {...P} /> : state === 'alert' ? <TriangleAlert {...P} /> : state === 'throttled' ? <PauseCircle {...P} /> : state === 'killed' ? <OctagonX {...P} /> : <CircleDashed {...P} />;
 };
-export const stateLabel = (s: AgentState) => STATE[s].label;
-export const StateIcon = ({ state, size = 20 }: { state: AgentState; size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{STATE[state].path}</svg>
+export const StateMark = ({ state }: { state: AgentState }) => <span className={`statemark s-${state}`}><StateIcon state={state} />{LABEL[state]}</span>;
+
+// ---------- verdicts ----------
+export const VerdictChip = ({ v, code }: { v: ActionEvent['verdict']; code?: string }) => (
+  <span className={`verdict v-${v}`}>{v === 'allow' ? <ShieldCheck size={14} aria-hidden /> : v === 'deny' ? <OctagonX size={14} aria-hidden /> : <PauseCircle size={14} aria-hidden />}{v === 'allow' ? 'Allowed' : v === 'deny' ? 'Denied' : 'Slowed'}{code && v !== 'allow' ? <span className="measured">{code}</span> : null}</span>
 );
-export const StateMark = ({ state }: { state: AgentState }) => (
-  <span className={`inline-flex items-center gap-1.5 font-medium ${state === 'alert' || state === 'throttled' ? 'text-accent' : state === 'killed' ? 'text-mute' : ''}`}>
-    <StateIcon state={state} />{STATE[state].label}
-  </span>
+
+// ---------- tiny graphics ----------
+export function Sparkline({ values, w = 96, h = 24, label, tone = 'cool' }: { values: number[]; w?: number; h?: number; label?: string; tone?: 'cool' | 'amber' | 'bad' | 'muted' }) {
+  if (values.length < 2) return <svg width={w} height={h} role="img" aria-label={label ?? 'no trend yet'} className="spark spark--empty"><line x1="0" x2={w} y1={h - 2} y2={h - 2} /></svg>;
+  const max = Math.max(...values, 1e-9), min = Math.min(...values, 0);
+  const x = (i: number) => (i / (values.length - 1)) * (w - 2) + 1, y = (v: number) => h - 2 - ((v - min) / (max - min || 1)) * (h - 5);
+  const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label ?? 'trend'} className={`spark spark--${tone}`}>
+      <path d={`${d}L${w - 1},${h - 1}L1,${h - 1}Z`} className="spark-area" /><path d={d} className="spark-line" /><circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r="2" />
+    </svg>
+  );
+}
+
+export function CountUp({ value, format, duration = 0.9 }: { value: number; format: (n: number) => string; duration?: number }) {
+  const reduce = useReducedMotion();
+  const [shown, setShown] = useState(reduce ? value : 0);
+  const prev = useRef(reduce ? value : 0);
+  useEffect(() => {
+    if (reduce) { setShown(value); prev.current = value; return; }
+    const c = animate(prev.current, value, { duration, ease: [0.16, 1, 0.3, 1], onUpdate: (v) => { prev.current = v; setShown(v); } });
+    return () => c.stop();
+  }, [value, reduce, duration]);
+  return <>{format(shown)}</>;
+}
+
+export const Initials = ({ name, size = 28 }: { name: string; size?: number }) => (
+  <span className="initials" style={{ width: size, height: size, ['--ini' as string]: `${size * 0.46}px` }} title={`Owner ${ownerShort(name)}`}>{initials(name)}</span>
 );
 
 // ---------- incidents ----------
@@ -51,83 +100,38 @@ export function groupIncidents(list: IncidentEvent[]): IncidentGroup[] {
   }
   return [...m.values()].sort((a, b) => b.last.ts - a.last.ts);
 }
-export function useLiveIncident(): IncidentGroup | null {
-  const incidents = useStore((s) => s.incidents);
-  const newest = useStore((s) => s.actions[s.actions.length - 1]?.ts ?? 0);
-  const g = groupIncidents(incidents)[0];
-  if (!g || g.last.stage === 'resolved') return null;
-  return newest - g.last.ts > 120000 && newest > 0 ? null : g;
-}
 
-// ---------- Verify drawer ----------
+// ---------- Verify sheet ----------
 export interface VerifySpec { title: string; what: string; field: string; shown: string; kind: 'measured' | 'ASSUMPTION'; command: string; extra?: string }
-const Ctx = createContext<(s: VerifySpec | null) => void>(() => undefined);
-export const useVerify = () => useContext(Ctx);
-
-export function VerifyProvider({ children }: { children: ReactNode }) {
-  const [spec, setSpec] = useState<VerifySpec | null>(null);
-  const opener = useRef<HTMLElement | null>(null);
+export function VerifySheet() {
+  const spec = useUi((u) => u.verify);
   const impact = useStore((s) => s.impact);
-  const close = useCallback(() => { setSpec(null); opener.current?.focus(); }, []);
-  const open = useCallback((s: VerifySpec | null) => { opener.current = document.activeElement as HTMLElement; setSpec(s); }, []);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!spec) return;
-    box.current?.querySelector<HTMLElement>('button')?.focus();
-    const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-      if (e.key === 'Tab') { // keep focus inside the drawer
-        const f = box.current!.querySelectorAll<HTMLElement>('button,a,[tabindex]'); const first = f[0], last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
-  }, [spec, close]);
+  const source = useStore((s) => s.source);
   return (
-    <Ctx.Provider value={open}>
-      {children}
-      {spec && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-          <div ref={box} role="dialog" aria-modal="true" aria-labelledby="vh" className="h-full w-full max-w-md overflow-y-auto border-l border-line bg-surface p-8 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <h2 id="vh" className="h-display text-3xl">{spec.title}</h2>
-              <button className="btn" onClick={close} aria-label="Close verification">Close</button>
+    <Dialog.Root open={!!spec} onOpenChange={(o) => !o && setUi({ verify: null })}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="scrim" />
+        <Dialog.Content className="sheet" aria-describedby="vh-d">
+          {spec && <>
+            <div className="sheet-h">
+              <Dialog.Title asChild><h2>{spec.title}</h2></Dialog.Title>
+              <Dialog.Close className="btn btn--icon" aria-label="Close verification"><X size={16} aria-hidden /></Dialog.Close>
             </div>
-            <p className="mt-4">{spec.what}</p>
-            <dl className="mt-6 space-y-5 text-[0.95rem]">
-              <div><dt className="text-mute">Shown as</dt><dd className="text-xl">{spec.shown}</dd></div>
-              <div><dt className="text-mute">Kind</dt><dd>{spec.kind === 'measured' ? <Measured /> : <Assumption />} {spec.kind === 'measured' ? 'Measured in a real run of the simulated fleet.' : 'A typed-in assumption, not a measurement.'}</dd></div>
-              <div><dt className="text-mute">Source field in impact.json</dt><dd className="font-mono text-sm break-all">{spec.field}</dd></div>
-              <div><dt className="text-mute">Last run</dt><dd>{impact?.generatedAt ? new Date(impact.generatedAt).toLocaleString() : <NotMeasured cmd={spec.command} />}<br /><span className="font-mono text-sm">git {impact?.gitSha ?? 'unknown'}</span></dd></div>
-              <div><dt className="text-mute">Reproduce it</dt><dd><code className="block rounded-md border border-line bg-bg px-3 py-2 font-mono text-sm">{spec.command}</code></dd></div>
-              {spec.extra && <div><dt className="text-mute">Note</dt><dd>{spec.extra}</dd></div>}
+            <Dialog.Description id="vh-d" className="sheet-lead">{spec.what}</Dialog.Description>
+            <dl className="facts">
+              <div><dt>Shown as</dt><dd className="reading reading--s">{spec.shown}</dd></div>
+              <div><dt>Kind</dt><dd>{spec.kind === 'measured' ? <Measured /> : <Assumption />} {spec.kind === 'measured' ? 'Measured in a real run of the simulated fleet.' : 'A typed-in assumption, not a measurement.'}</dd></div>
+              <div><dt>Source field</dt><dd className="measured wrap">{spec.field}</dd></div>
+              <div><dt>Last run</dt><dd>{source === 'fixture' ? <><FixtureChip /> <span className="muted">Fixture mode has no real run.</span></> : impact?.generatedAt ? <><span className="measured">{new Date(impact.generatedAt).toLocaleString()}</span><br /><span className="measured muted">git {impact?.gitSha ?? 'unknown'}</span></> : <NotMeasured cmd={spec.command} />}</dd></div>
+              <div><dt>Reproduce it</dt><dd><code className="codeblock measured">{spec.command}</code></dd></div>
+              {spec.extra && <div><dt>Note</dt><dd>{spec.extra}</dd></div>}
             </dl>
-          </div>
-        </div>
-      )}
-    </Ctx.Provider>
+          </>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
-export function VerifyButton({ spec }: { spec: VerifySpec }) {
-  const open = useVerify();
-  return <button className="btn !min-h-[36px] !py-1 !text-[0.85rem]" onClick={() => open(spec)} aria-haspopup="dialog">Verify<span className="sr-only"> {spec.title}</span></button>;
-}
-
-// ---------- spend line (plain SVG) ----------
-export interface Pt { t: number; v: number }
-export function Line({ pts, max, maxT, label, dashed, marks = [] }: { pts: Pt[]; max: number; maxT: number; label: string; dashed?: boolean; marks?: { t: number; text: string }[] }) {
-  const W = 520, H = 220, L = 46, B = 26, T = 12, R = 12;
-  const x = (t: number) => L + (t / (maxT || 1)) * (W - L - R), y = (v: number) => H - B - (v / (max || 1)) * (H - B - T);
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
-  const last = pts[pts.length - 1];
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={label}>
-      <title>{label}</title>
-      {[0, 0.5, 1].map((f) => (<g key={f}><line x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} stroke="var(--line)" /><text x={L - 6} y={y(max * f) + 4} textAnchor="end" fontSize="11" fill="var(--mute)">{usd(max * f)}</text></g>))}
-      {[0, 0.5, 1].map((f) => <text key={f} x={x(maxT * f)} y={H - 6} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'} fontSize="11" fill="var(--mute)">{(maxT * f).toFixed(0)} s</text>)}
-      {marks.map((m) => (<g key={m.text}><line x1={x(m.t)} x2={x(m.t)} y1={T} y2={H - B} stroke="var(--accent)" strokeDasharray="4 3" /><text x={x(m.t) + 5} y={T + 11} fontSize="11" fill="var(--accent)" fontWeight="600">{m.text}</text></g>))}
-      {pts.length > 1 && <path d={d} fill="none" stroke="var(--ink)" strokeWidth={dashed ? 2 : 3} strokeDasharray={dashed ? '6 5' : undefined} strokeLinejoin="round" />}
-      {last && <><circle cx={x(last.t)} cy={y(last.v)} r="4.5" fill="var(--ink)" /><text x={Math.min(x(last.t), W - R - 4)} y={y(last.v) < T + 22 ? y(last.v) + 20 : y(last.v) - 9} textAnchor="end" fontSize="13" fontWeight="600" fill="var(--ink)">{usd(last.v)}</text></>}
-    </svg>
-  );
-}
+export const VerifyButton = ({ spec }: { spec: VerifySpec }) => (
+  <button className="btn btn--sm" onClick={() => setUi({ verify: spec })} aria-haspopup="dialog"><BadgeCheck size={14} aria-hidden />Verify<span className="visually-hidden"> {spec.title}</span></button>
+);

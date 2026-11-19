@@ -1,115 +1,178 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { animate, motion, useReducedMotion } from 'motion/react';
+import { Check, CircleDashed, Flame, Play, RotateCcw, Rewind, Repeat2, ShieldQuestion } from 'lucide-react';
 import type { ActionEvent, DrillResult, IncidentStage } from '../../../contracts/types';
-import { resetDrills, runDrill, useStore, type DrillRun } from '../store';
-import { Line, NotMeasured, StateIcon, groupIncidents, secs, usd, type Pt } from '../ui';
+import { FIXTURE, resetDrills, runDrill, useStore, type DrillRun } from '../store';
+import { FixtureChip, Measured, StateMark, groupIncidents, ownerShort, secs, useNow, usd, type AgentState } from '../ui';
+import { Panel, ProofCard } from '../components';
+import { FleetMap } from './FleetMap';
 
 const DRILLS = [
-  { name: 'runaway-loop', ab: true, label: 'Runaway loop', note: 'A/B: same fault with and without controls' },
-  { name: 'ping-pong', ab: false, label: 'Agent ping-pong', note: 'Two agents calling each other forever' },
-  { name: 'scope-drift', ab: false, label: 'Scope drift', note: 'An agent reaching for a tool it was never given' },
-];
+  { name: 'runaway-loop', ab: true, label: 'Runaway loop', icon: Flame, note: 'An agent retries the same call in a tight loop. Run it with and without controls and race the spend.', agent: 'invoice-recon', involved: ['invoice-recon'] },
+  { name: 'ping-pong', ab: false, label: 'Agent ping-pong', icon: Repeat2, note: 'Two agents call each other forever. The loop lights up on the map.', agent: 'limits-checker', involved: ['limits-checker', 'credit-memo'] },
+  { name: 'scope-drift', ab: false, label: 'Scope drift', icon: ShieldQuestion, note: 'An agent reaches for a tool it was never given. A dashed drift edge pulses.', agent: 'support-summarizer', involved: ['support-summarizer'] },
+] as const;
+const WARMUP_GUESS = 5000; // sim/drills.ts WARMUP_MS: the real drill warms the fleet up for 5 s before injecting the fault
 const STEPS: { stage: IncidentStage; label: string; plain: string }[] = [
-  { stage: 'detected', label: 'Detect', plain: 'The gateway notices something is off.' },
+  { stage: 'detected', label: 'Detect', plain: 'The control plane notices an agent is off its own baseline.' },
   { stage: 'throttled', label: 'Throttle', plain: 'Calls are slowed so spend stops climbing.' },
-  { stage: 'paged', label: 'Page', plain: 'The owner gets a page.' },
-  { stage: 'killed', label: 'Contain', plain: 'The agent is stopped.' },
+  { stage: 'paged', label: 'Page', plain: 'The owner is paged (simulated).' },
+  { stage: 'owner_ack', label: 'Owner ack', plain: 'The owner acknowledges (simulated).' },
+  { stage: 'killed', label: 'Kill', plain: 'The agent identity is revoked.' },
   { stage: 'proof', label: 'Proof', plain: 'A probe tries to act and is refused.' },
 ];
 
-function series(actions: ActionEvent[], governed: boolean, start: number | undefined, agent?: string): { pts: Pt[]; agent?: string } {
-  if (start == null) return { pts: [] };
-  const rows = actions.filter((a) => a.governed === governed && a.ts >= start - 50);
-  if (!agent) { const sp: Record<string, number> = {}; rows.forEach((a) => (sp[a.agentId] = (sp[a.agentId] ?? 0) + a.costUsd)); agent = Object.entries(sp).sort((a, b) => b[1] - a[1])[0]?.[0]; }
+interface Pt { t: number; v: number }
+function series(actions: ActionEvent[], governed: boolean, t0: number | undefined, who: readonly string[], end?: number): Pt[] {
+  if (t0 == null) return [];
   let cum = 0;
   const pts: Pt[] = [{ t: 0, v: 0 }];
-  rows.filter((a) => a.agentId === agent).forEach((a) => { cum += a.costUsd; pts.push({ t: Math.max(0, (a.ts - start) / 1000), v: cum }); });
-  return { pts, agent };
+  for (const a of actions) {
+    if (a.governed !== governed || a.ts < t0 || !who.includes(a.agentId)) continue;
+    if (end != null && a.ts > end) break;
+    cum += a.costUsd; pts.push({ t: (a.ts - t0) / 1000, v: cum });
+  }
+  return pts;
 }
 
-function Timeline({ run }: { run: DrillRun | null }) {
-  const incidents = useStore((s) => s.incidents);
-  const agents = useStore((s) => s.agents);
-  const g = groupIncidents(incidents)[0];
-  const res = run?.results.find((r) => r.mode === 'governed');
-  const t0 = run?.starts.governed ?? g?.first;
-  const name = agents.find((a) => a.id === g?.agentId)?.name ?? g?.agentId;
+function RaceChart({ title, tone, pts, max, maxT, ph, marks = [], state, note }: { title: string; tone: 'bad' | 'cool'; pts: Pt[]; max: number; maxT: number; ph: number | null; marks?: { t: number; text: string }[]; state?: string; note?: string }) {
+  const W = 640, H = 190, L = 52, B = 26, T = 14, R = 14;
+  const x = (t: number) => L + (t / (maxT || 1)) * (W - L - R), y = (v: number) => H - B - (v / (max || 1)) * (H - B - T);
+  const shown = ph == null ? pts : pts.filter((p) => p.t <= ph);
+  const d = shown.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+  const last = shown[shown.length - 1];
   return (
-    <section className="panel" aria-labelledby="tl">
-      <h2 id="tl" className="h-display text-3xl">What happened, and how fast</h2>
-      <p className="mt-1 text-mute">{g ? <>Incident on <a href={`#/agent/${g.agentId}`}>{name}</a>. Times are seconds since {run?.starts.governed ? 'the fault was injected' : 'the first signal'}.</> : 'No incident yet. Run a drill to start one.'}</p>
-      <ol className="mt-5 space-y-1">
-        {STEPS.map((s) => {
-          const e = g?.byStage[s.stage];
-          const ms = res?.stages?.[s.stage] ?? (e && t0 != null ? e.ts - t0 : undefined);
-          const done = e != null || ms != null;
-          return (
-            <li key={s.stage} className={`grid grid-cols-[2rem_7rem_1fr_6rem] items-start gap-3 border-b border-line py-3 ${done ? '' : 'text-mute'}`}>
-              <span className={done ? 'text-ink' : ''}><StateIcon state={done ? 'healthy' : 'unknown'} /></span>
-              <span className="font-semibold">{s.label}</span>
-              <span>{e?.message ?? s.plain}{e?.proof && <span className="mt-1 block font-mono text-sm">receipt {e.proof.receiptId} · {e.proof.code}</span>}</span>
-              <span className="text-right text-xl tabular-nums">{ms != null ? `+${(ms / 1000).toFixed(1)} s` : 'waiting'}</span>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
-function AB({ run }: { run: DrillRun | null }) {
-  const actions = useStore((s) => s.actions);
-  const incidents = useStore((s) => s.incidents);
-  const d = useMemo(() => {
-    const un = run?.results.find((r) => r.mode === 'ungoverned'), go = run?.results.find((r) => r.mode === 'governed');
-    const a = series(actions, false, run?.starts.ungoverned, un?.agentId), b = series(actions, true, run?.starts.governed, go?.agentId);
-    const max = Math.max(0.01, ...a.pts.map((p) => p.v), ...b.pts.map((p) => p.v));
-    const maxT = Math.max(2, ...a.pts.map((p) => p.t), ...b.pts.map((p) => p.t));
-    const inc = groupIncidents(incidents.filter((i) => i.agentId === b.agent))[0];
-    const st = run?.starts.governed;
-    const marks = [inc?.byStage.throttled, inc?.byStage.killed].flatMap((e, i) => (e && st ? [{ t: (e.ts - st) / 1000, text: i ? 'stopped' : 'slowed' }] : []));
-    return { a, b, max, maxT, marks, un, go };
-  }, [actions, incidents, run]);
-  const ab = run?.ab;
-  if (!run || !ab) return <section className="panel"><h2 className="h-display text-3xl">Spend with and without controls</h2><p className="mt-2 text-mute">Run the Runaway loop (A/B) to draw both lines from the same fault.</p></section>;
-  const prot = d.un && d.go ? d.un.spendUsd - d.go.spendUsd : undefined;
-  return (
-    <section className="panel" aria-labelledby="ab">
-      <h2 id="ab" className="h-display text-3xl">Spend with and without controls</h2>
-      <div className="mt-4 grid gap-8 lg:grid-cols-2">
-        <figure><figcaption className="mb-1 font-semibold">A · No controls: keeps climbing</figcaption><Line pts={d.a.pts} max={d.max} maxT={d.maxT} dashed label={`Ungoverned cumulative spend, ends at ${usd(d.a.pts.at(-1)?.v ?? 0)}`} /></figure>
-        <figure><figcaption className="mb-1 font-semibold">B · Roll Call: bends flat after the slowdown</figcaption><Line pts={d.b.pts} max={d.max} maxT={d.maxT} marks={d.marks} label={`Governed cumulative spend, ends at ${usd(d.b.pts.at(-1)?.v ?? 0)}`} /></figure>
-      </div>
-      <p className="mt-4 text-lg">{prot != null ? <>The same fault cost <strong>{usd(d.un!.spendUsd)}</strong> without controls and <strong>{usd(d.go!.spendUsd)}</strong> with them: <strong>{usd(prot)}</strong> protected. <span className="chip">measured</span></> : run.phase === 'error' ? null : <span className="text-mute">{run.phase === 'done' ? 'Waiting for results.' : `Running the ${run.phase} half…`}</span>}</p>
-    </section>
+    <figure className={`race race--${tone}`}>
+      <figcaption><h2>{title}</h2>{state && <span className="muted">{state}</span>}</figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}: cumulative spend ${last ? usd(last.v) : 'none yet'} after ${last ? last.t.toFixed(1) : '0'} seconds`}>
+        {[0, 0.5, 1].map((f) => (<g key={f}><line x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} className="grid" /><text x={L - 8} y={y(max * f) + 4} textAnchor="end" className="axis">{usd(max * f)}</text></g>))}
+        {[0, 0.5, 1].map((f) => <text key={f} x={x(maxT * f)} y={H - 8} textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'} className="axis">{(maxT * f).toFixed(0)} s</text>)}
+        {marks.filter((m) => ph == null || m.t <= ph).map((m) => (<g key={m.text}><line x1={x(m.t)} x2={x(m.t)} y1={T} y2={H - B} className="mark" /><text x={x(m.t) + 5} y={T + 12} className="mark-t">{m.text}</text></g>))}
+        {shown.length > 1 && <><path d={`${d}L${x(last.t).toFixed(1)},${y(0)}L${x(0)},${y(0)}Z`} className="area" /><path d={d} className="line" /></>}
+        {last && <><circle cx={x(last.t)} cy={y(last.v)} r="5" className="dot" /><text x={Math.min(x(last.t) - 8, W - R - 4)} y={y(last.v) < T + 26 ? y(last.v) + 22 : y(last.v) - 10} textAnchor="end" className="endlabel">{usd(last.v)}</text></>}
+      </svg>
+      {note && <p className="race-note">{note}</p>}
+    </figure>
   );
 }
 
 export function Drill() {
   const run = useStore((s) => s.drillRun);
-  const impact = useStore((s) => s.impact);
-  const busy = run != null && run.phase !== 'done' && run.phase !== 'error';
-  const lastGov: DrillResult | undefined = run?.results.find((r) => r.mode === 'governed');
+  const actions = useStore((s) => s.actions);
+  const incidents = useStore((s) => s.incidents);
+  const agents = useStore((s) => s.agents);
+  const state = useStore((s) => s.fleet?.states);
+  const reduce = useReducedMotion();
+  const [pick, setPick] = useState<(typeof DRILLS)[number]['name']>('runaway-loop');
+  const d = DRILLS.find((x) => x.name === pick)!;
+  const active = run && run.name === d.name ? run : null;
+  const running = !!active && active.phase !== 'done' && active.phase !== 'error';
+  const [ph, setPh] = useState<number | null>(null);
+  const now = useNow(100);
+
+  const ungovRes = active?.results.find((r) => r.mode === 'ungoverned');
+  const govRes = active?.results.find((r) => r.mode === 'governed');
+  const t0u = ungovRes?.startedAt ?? (active?.starts.ungoverned != null ? active.starts.ungoverned + (FIXTURE ? 0 : WARMUP_GUESS) : undefined);
+  const t0g = govRes?.startedAt ?? (active?.starts.governed != null ? active.starts.governed + (FIXTURE ? 0 : WARMUP_GUESS) : undefined);
+  const A = useMemo(() => series(actions, false, t0u, d.involved, ungovRes ? ungovRes.startedAt + ungovRes.durationMs : undefined), [actions, t0u, ungovRes, d]);
+  const B = useMemo(() => series(actions, true, t0g, d.involved, govRes ? govRes.startedAt + govRes.durationMs : undefined), [actions, t0g, govRes, d]);
+  const max = Math.max(0.05, ...A.map((p) => p.v), ...B.map((p) => p.v));
+  const maxT = Math.max(4, Math.ceil(Math.max(...A.map((p) => p.t), ...B.map((p) => p.t), (govRes?.durationMs ?? 0) / 1000)));
+
+  const g = useMemo(() => { const gs = groupIncidents(incidents.filter((e) => e.agentId === d.agent || d.involved.includes(e.agentId as never))); return t0g != null ? gs.find((x) => x.first >= t0g - 2000) ?? null : null; }, [incidents, d, t0g]);
+  const agent = agents.find((a) => a.id === d.agent);
+  const agState = (state?.[d.agent] ?? 'unknown') as AgentState;
+  const elapsed = t0g != null && active?.phase === 'governed' && !g?.byStage.proof ? Math.max(0, (now - t0g) / 1000) : undefined;
+  const marks = useMemo(() => [g?.byStage.throttled, g?.byStage.killed].flatMap((e, i) => (e && t0g ? [{ t: (e.ts - t0g) / 1000, text: i ? 'killed' : 'throttled' }] : [])), [g, t0g]);
+  const proof = g?.byStage.proof?.proof;
+
+  const replay = () => {
+    setPh(0);
+    const c = animate(0, maxT, { duration: reduce ? 0.01 : Math.min(7, maxT * 1.2), ease: 'linear', onUpdate: (v) => setPh(v), onComplete: () => setPh(null) });
+    return c;
+  };
+  const start = () => { setPh(null); void runDrill(d.name, d.ab); };
+  const canReplay = d.ab && ungovRes && govRes;
+  const protectedUsd = ungovRes && govRes ? ungovRes.spendUsd - govRes.spendUsd : undefined;
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-6">
-        <div><h1 className="h-display text-5xl">Drill panel</h1><p className="mt-1 max-w-xl text-mute">Break a simulated agent on purpose and watch the real controls respond. Only the incident moves fast.</p></div>
-        <p className="text-mute">{impact?.drill ? <>Last full run: {impact.drill.runs} drills, p95 contain {impact.drill.timeToContainMs?.p95 != null ? secs(impact.drill.timeToContainMs.p95) : 'n/a'}</> : <NotMeasured cmd="make drill" />}</p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        {DRILLS.map((d) => (
-          <button key={d.name} className="btn btn-accent h-full flex-col !items-start !justify-start !py-5 text-left" disabled={busy} onClick={() => void runDrill(d.name, d.ab)}>
-            <span className="text-2xl font-semibold">Run drill: {d.label}</span><span className="text-[0.9rem] font-normal">{d.note}</span>
+    <div className="drill">
+      <header className="page-h">
+        <div><h1>Drill theatre</h1><p className="lead">Inject a fault into the simulated fleet and watch the controls respond. Every number is read from the stream or the drill result.</p></div>
+        {FIXTURE && <FixtureChip />}
+      </header>
+
+      <div className="drill-bar" role="radiogroup" aria-label="Choose a drill">
+        {DRILLS.map((x) => (
+          <button key={x.name} role="radio" aria-checked={pick === x.name} className={`pick ${pick === x.name ? 'is-on' : ''}`} onClick={() => { setPick(x.name); setPh(null); }} disabled={running}>
+            <x.icon size={18} aria-hidden /><span className="pick-t">{x.label}</span><span className="pick-n">{x.note}</span>
           </button>
         ))}
-        <button className="btn h-full justify-center !text-xl" disabled={busy} onClick={() => void resetDrills()}>Reset</button>
+        <div className="drill-go">
+          <button className="btn btn--primary btn--lg" onClick={start} disabled={running} data-tour="run-drill"><Play size={16} aria-hidden />{running ? `Running ${active?.phase === 'ungoverned' ? 'without controls' : 'with controls'}` : `Run ${d.label.toLowerCase()}`}</button>
+          <button className="btn" onClick={() => { void resetDrills(); setPh(null); }} disabled={running}><RotateCcw size={14} aria-hidden />Reset fleet</button>
+        </div>
       </div>
-      <div aria-live="polite">
-        {busy && <p className="text-lg"><StateIcon state="throttled" /> Running {run.ab ? `the ${run.phase} half` : 'the drill'}…</p>}
-        {run?.phase === 'error' && <p className="rounded-md border-2 border-accent p-4 text-accent">The drill did not finish: {run.error}</p>}
-        {run?.phase === 'done' && lastGov?.timeToContainMs != null && <p className="text-lg">Contained and proven in <strong>{secs(lastGov.timeToContainMs)}</strong> from the fault. <span className="chip">measured</span></p>}
+      {active?.phase === 'error' && <p className="note-bad" role="alert">The drill did not finish: {active.error}</p>}
+      {!active && <p className="muted">Pick a drill and run it. The real drill warms the fleet for a few seconds, injects the fault, then holds a fixed window.</p>}
+
+      <div className={`race-grid ${d.ab ? '' : 'race-grid--one'}`} data-tour="race">
+        {d.ab && <RaceChart title="Ungoverned" tone="bad" pts={A} max={max} maxT={maxT} ph={ph} state={ungovRes ? `${secs(ungovRes.durationMs)} window, ${ungovRes.calls} calls` : active?.phase === 'ungoverned' ? 'running now' : 'not run yet'} note="Same fault, no controls: the agent keeps calling until the window ends." />}
+        <RaceChart title={d.ab ? 'Governed' : 'With controls'} tone="cool" pts={B} max={max} maxT={maxT} ph={ph} marks={marks} state={govRes ? `${secs(govRes.durationMs)} window, ${govRes.calls} calls` : active?.phase === 'governed' ? 'running now' : 'not run yet'} note={d.name === 'scope-drift' ? 'Spend stays flat because every out-of-scope call is denied at the gateway.' : 'Same fault, controls on: slowed, paged, then stopped.'} />
+        {!d.ab && <Panel title={`${agent?.name ?? d.agent} on the map`} aside={<StateMark state={agState} />} id="tm-h" className="theatre-map">
+            <div className="map-frame map-frame--m"><FleetMap compact focus={d.name === 'ping-pong' ? undefined : d.agent} selected={null} onSelect={() => undefined} /></div>
+          </Panel>}
       </div>
-      <Timeline run={run} />
-      <AB run={run} />
+      <div className="race-sum">
+        {protectedUsd != null ? <p><Measured /> Without controls the agent spent <strong className="measured">{usd(ungovRes!.spendUsd)}</strong>; with controls <strong className="measured">{usd(govRes!.spendUsd)}</strong>. That is <strong className="measured">{usd(protectedUsd)}</strong> not spent in this one window.</p> : govRes && !d.ab ? <p><Measured /> The agent spent <strong className="measured">{usd(govRes.spendUsd)}</strong> over <span className="measured">{govRes.calls}</span> calls in the window.</p> : <p className="muted">The result appears here when the window closes.</p>}
+        {canReplay && <button className="btn btn--sm" onClick={replay}><Rewind size={14} aria-hidden />Replay the race side by side</button>}
+      </div>
+
+      <div className="theatre">
+        <Panel title="What happened, and how fast" className="stepper-panel" id="sp-h" aside={<span className="elapsed" aria-live="off">{elapsed != null ? <><span className="muted">Elapsed</span> <span className="measured elapsed-n">{elapsed.toFixed(1)} s</span></> : govRes?.timeToContainMs != null ? <><span className="muted">Contained in</span> <span className="measured elapsed-n">{secs(govRes.timeToContainMs)}</span></> : <span className="muted">Waiting for a governed run</span>}</span>}>
+          <Stepper g={g} res={govRes} t0={t0g} running={active?.phase === 'governed'} />
+        </Panel>
+        <div className="theatre-proof" data-tour="proof">
+          {proof ? <ProofCard agentId={g!.agentId} proof={proof} /> : (
+            <section className="proof proof--wait"><CircleDashed size={28} aria-hidden /><div><h3>Proof appears here</h3><p>When the agent is stopped, a probe replays a call as that agent. A denial with a receipt is the proof.</p></div></section>
+          )}
+          {d.ab && <Panel title={`${agent?.name ?? d.agent} on the map`} aside={<StateMark state={agState} />} id="tm2-h" className="theatre-map">
+            <div className="map-frame map-frame--s"><FleetMap compact focus={d.agent} selected={null} onSelect={() => undefined} /></div>
+          </Panel>}
+          <OwnerLine agentId={d.agent} />
+        </div>
+      </div>
     </div>
   );
 }
+
+function OwnerLine({ agentId }: { agentId: string }) {
+  const a = useStore((s) => s.agents.find((x) => x.id === agentId));
+  if (!a) return null;
+  return <p className="muted">Pages go to <strong>{ownerShort(a.owner.name)}</strong> at <span className="measured">{a.owner.escalation}</span>. No real page is sent.</p>;
+}
+
+function Stepper({ g, res, t0, running }: { g: ReturnType<typeof groupIncidents>[number] | null; res?: DrillResult; t0?: number; running: boolean }) {
+  const firstWaiting = STEPS.findIndex((s) => !g?.byStage[s.stage] && res?.stages?.[s.stage] == null);
+  return (
+    <ol className="stepper">
+      {STEPS.map((s, i) => {
+        const e = g?.byStage[s.stage];
+        const ms = res?.stages?.[s.stage] ?? (e && t0 != null ? e.ts - t0 : undefined);
+        const done = e != null || ms != null;
+        const cur = running && i === firstWaiting;
+        return (
+          <motion.li key={s.stage} className={`step ${done ? 'is-done' : ''} ${cur ? 'is-cur' : ''}`} animate={done ? { opacity: 1 } : { opacity: 0.72 }}>
+            <span className="step-i" aria-hidden="true">{done ? <Check size={14} /> : <span className="step-n">{i + 1}</span>}</span>
+            <span className="step-t">{s.label}</span>
+            <span className="step-time measured">{ms != null ? `+${(ms / 1000).toFixed(1)} s` : cur ? 'now' : 'waiting'}</span>
+            <span className="step-m">{e?.message ?? s.plain}</span>
+            {done && <span className="visually-hidden"> done</span>}
+          </motion.li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export type { DrillRun };
