@@ -53,6 +53,8 @@ kind-up: ## kind cluster + AgentRecord CRD + admission webhook
 	bash deploy/k8s/kind-up.sh
 admission-demo: ## try to run an unregistered agent in kind
 	bash deploy/k8s/admission-demo.sh
+a11y: ## axe-core on every UI route, real and fixture, both themes (run with `make demo` up)
+	NODE_PATH=$(shell npm root -g) node ui/a11y.cjs
 replay: ## build static Replay page from the last recorded run
 	$(NODE) scripts/replay.ts
 clean:
