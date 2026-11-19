@@ -1,0 +1,238 @@
+{
+  "bench": {
+    "command": "node scripts/bench.ts",
+    "requests": 6000,
+    "concurrency": 16,
+    "tool": "ledger.read",
+    "note": "p50/p95/p99 are the gateway-reported decision path in ms (excludes tool time). endToEnd includes client + HTTP + mock tool.",
+    "governed": {
+      "p50": 0.02570000011473894,
+      "p95": 0.06516799982637167,
+      "p99": 0.09013399994000793,
+      "endToEnd": {
+        "p50": 6.05308100000002,
+        "p95": 10.577296000000388,
+        "p99": 14.500298999999359
+      },
+      "rps": 2279.3549704426696,
+      "notAllowed": 0
+    },
+    "direct": {
+      "p50": 0.0030620000325143337,
+      "p95": 0.011947999941185117,
+      "p99": 0.021942000137642026,
+      "endToEnd": {
+        "p50": 5.197514999999839,
+        "p95": 10.144139999999425,
+        "p99": 13.627480000001015
+      },
+      "rps": 2585.8442352414963,
+      "notAllowed": 0
+    },
+    "overheadP99Ms": 0.8728189999983442,
+    "throughputRps": 2279.3549704426696,
+    "targetDecisionP99Ms": 50
+  },
+  "generatedAt": "2026-11-19T06:34:42.962Z",
+  "gitSha": "37bd34f",
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "node": "v22.23.5",
+    "os": "linux 6.18.44-fc-v653"
+  },
+  "fleet": {
+    "registered": 12,
+    "running": 12,
+    "unregisteredRunning": 0,
+    "byRisk": {
+      "low": 2,
+      "medium": 5,
+      "high": 4,
+      "critical": 1
+    },
+    "byLifecycle": {
+      "shadow": 2,
+      "canary": 2,
+      "production": 8
+    },
+    "baselineCallsPerSec": 17,
+    "baselineSpendPerMinUsd": 0.0751,
+    "states": {
+      "fraud-triage": "healthy",
+      "kyc-refresh": "healthy",
+      "aml-testgen": "healthy",
+      "invoice-recon": "healthy",
+      "mortgage-docs": "healthy",
+      "support-summarizer": "healthy",
+      "limits-checker": "healthy",
+      "credit-memo": "healthy",
+      "payment-orchestrator": "healthy",
+      "collections-nudge": "healthy",
+      "regulatory-digest": "healthy",
+      "treasury-forecast": "healthy"
+    }
+  },
+  "drill": {
+    "runs": 20,
+    "windowMs": 12000,
+    "warmupMs": 5000,
+    "drill": "runaway-loop",
+    "agentId": "invoice-recon",
+    "command": "node scripts/drill.ts --runs 20",
+    "spendProtectedUsd": {
+      "ungovernedMean": 0.701499,
+      "governedMean": 0.04123,
+      "protectedMean": 0.660269,
+      "protectedTotal": 13.20538,
+      "perRunUsd": [
+        0.662625,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.65968,
+        0.662625,
+        0.662625,
+        0.65968,
+        0.662625
+      ]
+    },
+    "callsMean": {
+      "ungoverned": 476.4,
+      "governed": 67
+    },
+    "timeToContainMs": {
+      "p50": 2026,
+      "p95": 2225,
+      "max": 2231,
+      "samples": [
+        2231,
+        2005,
+        2009,
+        2025,
+        2026,
+        2006,
+        2027,
+        2028,
+        2006,
+        2027,
+        2004,
+        2023,
+        2025,
+        2028,
+        2029,
+        2028,
+        2225,
+        2202,
+        2025,
+        2225
+      ],
+      "uncontained": 0
+    },
+    "stagesP95Ms": {
+      "detected": 752,
+      "throttled": 752,
+      "paged": 752,
+      "owner_ack": 1997,
+      "killed": 1999,
+      "proof": 2225
+    },
+    "budgetsMs": {
+      "detect": 10000,
+      "throttle": 5000,
+      "page": 5000,
+      "killAndProof": 10000,
+      "containP95": 30000
+    }
+  },
+  "detector": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "tn": 9,
+    "precision": 1,
+    "recall": 1,
+    "definition": "\"Hard containment fired\" (hard throttle or kill). Positives: runaway-loop, ping-pong, scope-drift. Negatives: healthy-burst, slow-repeat, normal (any hard incident on any agent counts as a false positive).",
+    "runsPerCase": 3,
+    "cases": {
+      "runaway-loop": {
+        "positive": true,
+        "runs": 3,
+        "detected": 3,
+        "hardContained": 3,
+        "collateral": 0
+      },
+      "ping-pong": {
+        "positive": true,
+        "runs": 3,
+        "detected": 3,
+        "hardContained": 3,
+        "collateral": 3
+      },
+      "scope-drift": {
+        "positive": true,
+        "runs": 3,
+        "detected": 3,
+        "hardContained": 3,
+        "collateral": 0
+      },
+      "healthy-burst": {
+        "positive": false,
+        "runs": 3,
+        "detected": 3,
+        "hardContained": 0,
+        "collateral": 0
+      },
+      "slow-repeat": {
+        "positive": false,
+        "runs": 3,
+        "detected": 3,
+        "hardContained": 0,
+        "collateral": 0
+      },
+      "normal": {
+        "positive": false,
+        "runs": 3,
+        "detected": 0,
+        "hardContained": 0,
+        "collateral": 0
+      }
+    }
+  },
+  "assumptions": {
+    "label": "ASSUMPTIONS, not measurements. Prices are illustrative; edit contracts/prices.ts to change them.",
+    "pricesUsdPerCall": {
+      "ledger.read": 0.0002,
+      "ledger.post": 0.0005,
+      "txn.lookup": 0.0003,
+      "kyc.lookup": 0.0008,
+      "docs.search": 0.0004,
+      "payments.transfer": 0.001,
+      "fraud.flag": 0.0002,
+      "agent.call": 0.0001,
+      "approvals.enqueue": 0.0001,
+      "limits.get": 0.0002,
+      "mail.send": 0.0005,
+      "llm.complete": 0.005,
+      "llm.in.per1k": 0.003,
+      "llm.out.per1k": 0.015
+    },
+    "llmTokenPricesUsdPer1k": {
+      "input": 0.003,
+      "output": 0.015
+    },
+    "llmCompletions": "Recorded responses from sim/recorded-llm.json; token counts are pre-written approximations.",
+    "simulatedPager": "Pager and owner acknowledgement (auto-ack after ~1 s) are simulated; no real page is sent."
+  }
+}
