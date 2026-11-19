@@ -1,0 +1,12 @@
+{
+  "name": "roll-call",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "node --test 'services/**/*.test.ts' 'sim/**/*.test.ts'",
+    "test:acceptance": "node --test --test-concurrency=1 tests/acceptance/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": { "typescript": "5.9.3", "@types/node": "22.19.1" }
+}

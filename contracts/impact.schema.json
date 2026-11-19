@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "impact.json — every number the UI and docs show. Written only by real runs.",
+  "type": "object",
+  "required": ["generatedAt", "gitSha", "fleet", "drill", "detector", "assumptions"],
+  "properties": {
+    "generatedAt": {"type": "string"},
+    "gitSha": {"type": "string"},
+    "environment": {"type": "object", "description": "cpu, node version, os — where the numbers came from"},
+    "fleet": {"type": "object", "required": ["registered", "running", "unregisteredRunning"]},
+    "drill": {
+      "type": "object",
+      "required": ["runs", "spendProtectedUsd", "timeToContainMs", "stagesP95Ms", "command"],
+      "properties": {
+        "runs": {"type": "integer", "minimum": 20},
+        "windowMs": {"type": "integer"},
+        "spendProtectedUsd": {"type": "object", "required": ["ungovernedMean", "governedMean", "protectedMean", "protectedTotal"]},
+        "timeToContainMs": {"type": "object", "required": ["p50", "p95", "max", "samples"]},
+        "stagesP95Ms": {"type": "object"},
+        "command": {"type": "string"}
+      }
+    },
+    "detector": {"type": "object", "required": ["tp", "fp", "fn", "tn", "precision", "recall", "cases"]},
+    "bench": {"type": "object", "required": ["governed", "direct", "overheadP99Ms", "throughputRps", "command"]},
+    "chaos": {"type": "object"},
+    "assumptions": {"type": "object", "description": "Every value here is an ASSUMPTION and must be labeled so in the UI", "required": ["pricesUsdPerCall"]}
+  }
+}
