@@ -97,7 +97,8 @@ export interface PolicyBundle {
   staleAfterMs: number;                      // after this with no fresh bundle, high-risk tools fail closed
 }
 
-export type IncidentStage = 'detected' | 'throttled' | 'paged' | 'owner_ack' | 'killed' | 'proof' | 'kill_unconfirmed' | 'resolved';
+export type IncidentStage = 'detected' | 'throttled' | 'paged' | 'owner_ack' | 'killed' | 'proof' | 'kill_unconfirmed' | 'resolved'
+  | 'canary_started' | 'rolled_back' | 'promoted';   // release stages (ADR-014): detected = canary analysis failed, rolled_back / promoted = the verdict
 
 export interface IncidentEvent {
   incidentId: string;
@@ -145,4 +146,39 @@ export interface DrillResult {
   detected: boolean;
   hardContained: boolean;        // hard throttle or kill happened (negatives: on ANY agent, so collateral false positives count)
   collateralIncidents?: string[]; // other agents that raised an incident during the window
+  // Release drills (bad-release, good-release) only:
+  outcome?: 'rolled_back' | 'promoted' | 'undecided';
+  timeToRollbackMs?: number | null; // ms from fault start (canary traffic start) to 'rolled_back'
+  gates?: GateCheck[];              // the gate checklist behind the verdict
+}
+
+/** One promotion gate and its verdict, in plain English. */
+export interface GateCheck { name: string; passed: boolean; detail: string }
+export interface PromotionResult {
+  allowed: boolean;
+  reason: string;                 // plain English: "Blocked: no evaluation evidence on file ..." or "Allowed: ..."
+  checks: GateCheck[];
+  from: LifecycleState; to: LifecycleState;
+  dryRun?: boolean;               // true when nothing was changed
+  record?: AgentRecord;           // the record after a real, allowed promotion
+}
+/** Gateway-event statistics for one version during the canary window. errors = any non-allow verdict. */
+export interface CanaryStats { calls: number; errors: number; p99Ms: number }
+/** Everything a promotion verdict is computed from. null = no evidence on file (the gate fails). */
+export interface PromotionEvidence {
+  to: LifecycleState;
+  now: number;                                                                            // epoch ms
+  drills: { uncontained: number; containP95Ms: number; containBudgetMs: number } | null; // impact.json drill
+  attackSuite: { positives: number; missed: number } | null;                              // impact.json detector (tp + fn, fn)
+  canary: { candidate: CanaryStats; baseline: CanaryStats } | null;
+  budget: { calls: number; errors: number } | null;                                       // stable version's recent decisions
+}
+/** A version bump running as a canary next to the stable version (POST /v1/agents/:id/releases). */
+export interface Release {
+  id: string; agentId: string; variantId: string;   // variantId = "<agentId>@<version>", the identity the canary acts as
+  stableVersion: string; candidateVersion: string;
+  share: number;                                    // fraction of the agent's traffic the canary takes
+  startedAt: number;                                // epoch ms, canary traffic starts (fault start in the bad-release drill)
+  state: 'canary' | 'promoted' | 'rolled_back';
+  endedAt?: number; result?: PromotionResult;
 }
