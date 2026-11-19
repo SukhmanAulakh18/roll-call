@@ -1,6 +1,6 @@
 # Roll Call — every claim has a target. Offline by default.
 NODE ?= node
-.PHONY: help test acceptance typecheck demo stack drill drill-release bench chaos exec-pack verify ui replay compose-up compose-down observe observe-otel slo slo-test k6 kind-up admission-demo clean print
+.PHONY: help test acceptance typecheck demo stack drill drill-release bench chaos exec-pack verify ui replay compose-up compose-down observe observe-otel slo slo-test k6 kind-up admission-demo clean print video
 
 help: ## list targets
 	@grep -E '^[a-z0-9-]+:.*##' Makefile | sed 's/:.*##/ —/'
@@ -62,3 +62,5 @@ clean:
 print: ## A5 leave-behind PDF/PNG and print/pitch-numbers.md, all from impact.json
 	$(NODE) print/build.ts
 	NODE_PATH=$$(npm root -g) $(NODE) print/render.ts
+video: ## record the real demo flow to docs/media/roll-call-demo.mp4 (run with `make demo` up)
+	NODE_PATH=$$(npm root -g) $(NODE) scripts/record-demo.cjs
