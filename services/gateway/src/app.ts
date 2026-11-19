@@ -38,7 +38,8 @@ export const validBundle = (b: any): b is PolicyBundle =>
   isObj(b) && typeof b.version === 'number' && isObj(b.agents) && isObj(b.revoked) && isObj(b.throttles) && isObj(b.prices)
   && Array.isArray(b.highRiskTools) && typeof b.staleAfterMs === 'number' && Number.isFinite(b.staleAfterMs);
 
-const BUCKETS = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1];
+// 10 us .. 100 ms. 0.05 (the 50 ms SLO threshold) must stay a bucket edge: slo/decision-latency-p99.yaml reads le="0.05".
+const BUCKETS = [0.00001, 0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1];
 
 export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
   const id = opts.gatewayId, policy = opts.policy ?? defaultPolicy, maxQueue = opts.maxQueue ?? 20_000;
@@ -54,7 +55,8 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
     const w = m.get(k); if (!w || now - w.start >= span) m.set(k, { start: now, sum: usd }); else w.sum += usd;
   };
   const decisions = new Map<string, number>();
-  const hist = new Array(BUCKETS.length + 1).fill(0); let histSum = 0, histCount = 0, dropped = 0, spendTotal = 0, bundlesRejected = 0;
+  const hist = new Array(BUCKETS.length + 1).fill(0); let histSum = 0, histCount = 0, dropped = 0, spendTotal = 0, bundlesRejected = 0, receiptsTotal = 0;
+  const byAgent = new Map<string, number>(); // key agent|verdict; agent is the authenticated id or 'unauthenticated' so callers cannot inflate cardinality
   const observe = (ms: number) => { const s = ms / 1000; let i = 0; while (i < BUCKETS.length && s > BUCKETS[i]) i++; hist[i]++; histSum += s; histCount++; };
 
   function takeToken(agentId: string, now: number): boolean {
@@ -137,10 +139,11 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
         }
       }
     }
-    const rec = receipts.append({ agentId: req.agentId, tool: req.tool, argsHash: ah, verdict, code, costUsd: cost });
+    const rec = receipts.append({ agentId: req.agentId, tool: req.tool, argsHash: ah, verdict, code, costUsd: cost }); receiptsTotal++;
     const latencyMs = hr() - t0 - toolMs;
     record(req, ah, { verdict, code }, cost, latencyMs, rec.id, true);
     const key = `${verdict}|${code}`; decisions.set(key, (decisions.get(key) ?? 0) + 1); observe(latencyMs);
+    const ak = `${v.ok && v.agentId === req.agentId ? req.agentId : 'unauthenticated'}|${verdict}`; byAgent.set(ak, (byAgent.get(ak) ?? 0) + 1);
     return { status, body: { verdict, reason, code, receiptId: rec.id, costUsd: cost, latencyMs, ...(result !== undefined ? { result } : {}) } };
   }
 
@@ -166,6 +169,9 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
     if (req.method === 'GET' && req.url === '/metrics') {
       const L: string[] = ['# TYPE rollcall_gateway_decisions_total counter'];
       for (const [k, n] of decisions) { const [vd, cd] = k.split('|'); L.push(`rollcall_gateway_decisions_total{gateway="${id}",verdict="${vd}",code="${cd}"} ${n}`); }
+      L.push('# TYPE rollcall_gateway_agent_decisions_total counter');
+      for (const [k, n] of byAgent) { const [ag, vd] = k.split('|'); L.push(`rollcall_gateway_agent_decisions_total{gateway="${id}",agent="${ag}",verdict="${vd}"} ${n}`); }
+      L.push('# TYPE rollcall_gateway_receipts_total counter', `rollcall_gateway_receipts_total{gateway="${id}"} ${receiptsTotal}`);
       L.push('# TYPE rollcall_gateway_events_dropped_total counter', `rollcall_gateway_events_dropped_total{gateway="${id}"} ${dropped}`);
       L.push('# TYPE rollcall_gateway_bundles_rejected_total counter', `rollcall_gateway_bundles_rejected_total{gateway="${id}"} ${bundlesRejected}`);
       L.push('# TYPE rollcall_gateway_spend_usd_total counter', `rollcall_gateway_spend_usd_total{gateway="${id}"} ${spendTotal}`);

@@ -8,7 +8,10 @@ export interface FleetControl {
   start(agentId: string): Promise<void>;
   inject(agentId: string, kind: FaultKind, mode: DrillMode): Promise<void>;
   clear(agentId?: string): Promise<void>;
-  reset(): Promise<void>;              // clear faults, start every agent
+  reset(): Promise<void>;              // clear faults, stop canaries, start every agent
+  /** Run a second variant of agentId acting as variantId, taking `share` of the agent's traffic. fault 'errors' = the new version's requests fail. */
+  startCanary(agentId: string, variantId: string, share: number, fault?: 'errors'): Promise<void>;
+  stopCanary(variantId: string): Promise<void>;   // variant stops, the stable one takes all traffic again
 }
 
 /** Client for a fleet running in another process (`serve.ts --role fleet`). */
@@ -24,5 +27,7 @@ export function httpFleet(base: string): FleetControl {
     inject: async (id, kind, mode) => { await call('/fleet/inject', { agentId: id, kind, mode }); },
     clear: async id => { await call('/fleet/clear', { agentId: id }); },
     reset: async () => { await call('/fleet/reset'); },
+    startCanary: async (agentId, variantId, share, fault) => { await call('/fleet/canary', { agentId, variantId, share, fault }); },
+    stopCanary: async variantId => { await call('/fleet/canary/stop', { variantId }); },
   };
 }

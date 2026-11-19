@@ -8,6 +8,7 @@ import type { Out } from '../../lib/http.ts';
 import { verifyChain } from '../../gateway/src/receipts.ts';
 import { checkRecord, review } from './admission.ts';
 import { createEngine } from './engine.ts';
+import { createMetrics } from './metrics.ts';
 import { issueToken } from './identity.ts';
 import { createRegistry } from './registry.ts';
 import type { DrillMode, FleetControl } from './runtime.ts';
@@ -40,7 +41,9 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
   const tokens = new Map<string, { token: string; expiresAt: number }>();
   const clients = new Set<http.ServerResponse>();
   const ttl = opts.ttlMs ?? 60_000;
+  const metrics = createMetrics();
   const publish = (m: StreamMessage) => {
+    metrics.onMessage(m);
     if (!clients.size) return;
     const s = `data: ${JSON.stringify(m)}\n\n`;
     for (const c of clients) if (c.writableLength < 1_000_000) c.write(s);
@@ -52,6 +55,7 @@ export async function startControl(opts: ControlOpts): Promise<ControlHandle> {
 
   const r = createRouter(CORS);
   r.add('GET', '/healthz', () => ok({ ok: true, bundleVersion: registry.version() }));
+  r.add('GET', '/metrics', async () => { const f = await engine.summary(); return { status: 200, body: metrics.render({ ...f, bundleVersion: registry.version(), acks, now: clock() }) }; });
   r.add('GET', '/v1/agents', () => ok(registry.list()));
   r.add('GET', '/v1/agents/:id', c => {
     const rec = registry.get(c.params.id); if (!rec) return fail(404, `no agent '${c.params.id}'`);
