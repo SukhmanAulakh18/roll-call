@@ -70,7 +70,7 @@ const [qrReplay, qrRepo] = await Promise.all([qr(PAGE), qr(REPO)]);
 const questions: [string, string][] = [
   ['What agents exist?', 'Every agent has an owner, purpose, risk rating and scopes. Unregistered workloads are refused.'],
   ['What can each one touch?', 'Tools and scopes are checked on every call against its own allow-list.'],
-  ['What does each one cost, and what value?', 'Every call is recorded and metered against a budget. Prices in the demo are assumptions.'],
+  ['What does each one cost?', 'Every call is recorded and metered against a budget. Prices in the demo are assumptions; value is not measured.'],
   ["Can I stop one right now, and prove it's stopped?", 'A kill revokes its identity, then an outside probe must be refused.'],
 ];
 

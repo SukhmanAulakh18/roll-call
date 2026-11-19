@@ -25,21 +25,21 @@ Use this after the 40-second pitch, when the room asks for more.
 
 1. "Most agent stacks leave the control loop to the operator. Ours has four parts: detect, throttle, page, and kill."
 2. "A kill revokes the agent's identity, stops its runtime, then an outside probe replays the agent's last action. The probe must be refused. If it is not refused, the screen says the kill is not proven."
-3. "Admission refuses any workload without a registered agent label, before it runs."
-4. "The gateway adds <<overhead_p99>> at p99, end to end, on one laptop with no TLS. That is not production latency."
+3. "Admission refuses any workload without a registered agent label, before it runs." (In the demo this is the control-plane admission check. On Kubernetes, only the label check has run against a real API server; the record-lookup webhook has not, ADR-013.)
+4. "Latency: <<overhead_p99>>. The decision code itself is <<decision_p99>>." Do not quote the k6 figures in `bench.k6` without saying they were taken with incident detection off.
 5. "For hard containment, the detector scored <<detector_precision>> precision and <<detector_recall>> recall on <<detector_runs_per_case>> runs per case. These are small, scripted runs. Soft alerts fired in <<soft_alerts_on_negatives>> negative-case runs, so the noise is on the record too."
 6. "We ran <<chaos_game_days>> game days. The results are in the chaos section of impact.json and in the exec pack."
 7. "The open-source projects are options we build beside. What we built is the control loop and the proof."
 
 ## Openers by audience
 
-Each opener says what the demo shows. None says that the company uses, plans, has seen or endorses Roll Call. The headings name the room, not a relationship.
+Each opener says what Roll Call shows. None says that the company uses, plans, has seen or endorses Roll Call, and none describes any company's own systems or data. The headings name the room, not a relationship.
 
-- **RBC / Borealis platform.** "This is what a platform team would see on one screen: the agent inventory, what each agent can touch, and the kill path with its proof."
-- **TD.** "Start with the question a risk owner asks first: which agents exist, and who owns each one. Show the Registry, then the admission gate."
-- **BMO.** "Start with spend. Every call is checked against a budget. Then show the drill where spend was kept out, at assumed prices."
-- **TELUS.** "Start with containment. A runaway agent is throttled, paged and killed, and a probe shows it is refused. Then say what the simulated acknowledgement means."
-- **Recruiters.** "Start with the build. A control loop and proof on top of open-source parts, measured honestly, with the limits stated first."
+- **RBC.** "Roll Call shows, on one screen, a simulated agent inventory, what each agent can touch, and the kill path with its proof."
+- **TD.** "Roll Call shows which agents exist and who owns each one, then refuses one that is not registered." Show the Registry, then the admission gate.
+- **BMO.** "Roll Call shows spend per agent, with every call checked against a budget." Then show the drill where spend was kept out, at assumed prices.
+- **TELUS.** "Roll Call shows a runaway agent throttled, paged and killed, and a probe that proves it is refused." Then say what the simulated acknowledgement means.
+- **Recruiters.** "Roll Call shows the build: a control loop and proof beside open-source parts, measured honestly, with the limits stated first."
 
 ## Objection lines
 
@@ -54,7 +54,7 @@ Each opener says what the demo shows. None says that the company uses, plans, ha
 ## Never say
 
 - That a bank, a company or a regulator uses, plans, has approved or endorses Roll Call, or is a customer.
-- That the data is real, that customers are involved, or that anything runs in production.
+- That the data is real or comes from any bank, that customers are involved, or that anything runs in production.
 - That the overhead figure is decision latency or production latency. It is an end-to-end difference of two p99s.
 - "Time to contain" without "including a simulated owner acknowledgement".
 - "Zero false alarms", "100 per cent", or "perfect detection" without the hard-containment qualifier and the run count.
@@ -62,7 +62,7 @@ Each opener says what the demo shows. None says that the company uses, plans, ha
 - "Compliant", "meets the guideline" or "E-23 compliant". The E-23 mapping is an engineering interpretation, not compliance advice.
 - "Guaranteed", "cannot be bypassed", "tamper-proof" or "secure" as absolutes. Receipts are tamper-evident with no external anchor yet. The gateway is a reference, not a security boundary.
 - "The owner is paged first" without "simulated". No real page is sent.
-- MTTD or MTTR. Those figures are configuration settings, not measurements.
+- MTTD or MTTR. The game-day values track configured settings (staleness limit, localhost restart), so they are not operational detection or repair times.
 - That agentgateway, kagent, agent-sandbox, the Microsoft governance toolkit or Langfuse is integrated or in use. They are options, and none is a dependency.
 - "95 of 100 runs". There were <<drill_runs>> drill runs.
 - Any owner name as a real person. Owner names are fictional.
@@ -76,7 +76,7 @@ These come from `exec-pack/exec-review.md`. Say the first two before anyone asks
 2. Drills are synthetic. Our own runner injects the faults, so detection rates describe those faults only.
 3. The detector sample is small: <<detector_runs_per_case>> runs per case, hard containment only. Soft alerts fired in <<soft_alerts_on_negatives>> negative-case runs. In the ping-pong case, every run caused a collateral incident on another agent.
 4. Time to contain includes a simulated owner acknowledgement. A real page would take longer; we have not measured that.
-5. Overhead is a difference of two end-to-end p99s on one laptop, over loopback, with no TLS.
+5. Overhead is a difference of two end-to-end p99s on one laptop, over loopback, with no TLS. The k6 run (`bench.k6`) had incident detection off.
 6. Prices and any savings are assumptions in `contracts/prices.ts`.
 7. The gateway is a reference. Production should use agentgateway or an equivalent (ADR-001). A per-agent budget in agentgateway was not proven, and the Microsoft governance toolkit was not run end to end from the Node process.
 8. The probe proves denial only at the gateways the control plane knows about. Nothing enforces gateway-only egress at the network layer.
@@ -87,3 +87,4 @@ These come from `exec-pack/exec-review.md`. Say the first two before anyone asks
 13. The E-23 page is an engineering interpretation. The mapping to the bank's own inventory fields has not been done. It is not legal, regulatory or compliance advice.
 14. Licences for the open-source components are not verified (README licence table is TBD).
 15. Not affiliated with or endorsed by any company or regulator named.
+16. The release drill injects one simulated fault kind (failing requests) into one agent. Latency and scope regressions are gated but not drilled (ADR-014).

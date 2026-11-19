@@ -30,7 +30,7 @@ ${stamp} ${SIM}
 
 **Why now.** OSFI Guideline E-23 (model risk management) takes effect May 1, 2027. Our engineering reading is that it expects an accurate, evergreen model inventory with owners, approved uses and monitoring, including monitoring that the model stays within its approved scope. An agent fleet changes faster than a quarterly inventory refresh. This is an engineering interpretation, not compliance advice; the mapping is in \`e23-mapping.md\`.
 
-## Three numbers
+## Headline numbers
 
 | What | Result | Field in impact.json |
 |---|---|---|
@@ -39,7 +39,7 @@ ${stamp} ${SIM}
 | Spend kept out per runaway drill, mean (${V('drill.spendProtectedUsd.protectedTotal')} across all drills) | **${V('drill.spendProtectedUsd.protectedMean')}** | \`drill.spendProtectedUsd.protectedMean\` |
 | Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency. Zero or negative means within run-to-run noise | **${V('bench.overheadP99Ms')}** | \`bench.overheadP99Ms\` |
 
-**Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In ${V('release.badRuns')} drills with a faulty new version, ${V('release.autoRollbacks')} were rolled back automatically (p95 ${V('release.timeToRollbackMs.p95')} from the first faulty call); ${V('release.falseRollbacks')} good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted error budget (ADR-014).
+**Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In ${V('release.badRuns')} drills with a faulty new version, ${V('release.autoRollbacks')} were rolled back automatically (p95 ${V('release.timeToRollbackMs.p95')} from the moment the new version took traffic); ${V('release.falseRollbacks')} good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted per-agent error budget, computed from an in-memory ledger (ADR-014).
 
 Also measured: ${V('fleet.registered')} agents registered and ${V('fleet.unregisteredRunning')} running without a record; detector precision ${V('detector.precision')} and recall ${V('detector.recall')} for HARD containment with ${V('detector.fp')} hard false alarms, at ${V('detector.runsPerCase')} runs per case (small and scripted); soft alerts, which only throttle gently, appeared in ${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')} negative-case runs; low-risk success ratio ${M('control-plane-stop', 'lowRiskDuringOutage.ratio')} while the control plane was stopped. Dollar amounts use price assumptions (\`cost-model.md\`), not real invoices.
 
@@ -47,7 +47,7 @@ Also measured: ${V('fleet.registered')} agents registered and ${V('fleet.unregis
 
 1. **The results are from simulation.** Agents are scripted and faults are injected by us. *Mitigation:* the 30-day pilot phase is read-only discovery on real traffic, so baselines come from real agents before any enforcement.
 2. **Failing closed has a business cost.** If the control plane is unreachable, high-risk tools are refused after the policy goes stale. *Mitigation:* low-risk work continued in the game day and high-risk calls were denied on purpose; the staleness limit is a setting the risk owner chooses (\`docs/runbooks/control-plane-down.md\`).
-3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged first. Measured hard false alarms are ${V('detector.fp')} on the labelled set (${V('detector.runsPerCase')} runs per case, small and synthetic), and soft alerts appeared in ${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')} negative-case runs; the pilot measures this on real traffic.
+3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged before any kill (the pager and acknowledgement are simulated in this demo). Measured hard false alarms are ${V('detector.fp')} on the labelled set (${V('detector.runsPerCase')} runs per case, small and synthetic), and soft alerts appeared in ${V('detector.softOnNegatives.runsWithAlert')} of ${V('detector.softOnNegatives.runs')} negative-case runs; the pilot measures this on real traffic.
 
 ## Build, buy or extend
 
@@ -90,7 +90,7 @@ Full diagrams: [\`docs/architecture.md\`](../docs/architecture.md). In short: a 
 
 ## Release gates and auto-rollback
 
-A version bump runs as a canary taking half of the agent's traffic under its own identity, so gateway events tell the two versions apart. Control judges it with \`evaluatePromotion\` (\`services/control/src/lifecycle.ts\`): evaluation evidence present, passed and fresh; drill regression; attack suite with zero escapes; canary error rate and p99 against stable; error budget not exhausted. Failing gates roll the canary back; passing ones promote it after the window. Design and thresholds: ADR-014.
+A version bump runs as a canary taking half of the agent's traffic under its own identity, so gateway events tell the two versions apart. Control judges it with \`evaluatePromotion\` (\`services/control/src/lifecycle.ts\`): evaluation evidence present, passed and fresh; drill regression; attack suite with zero escapes; canary error rate and p99 against stable; per-agent error budget not exhausted (in-memory ledger in control, not the Prometheus SLOs in \`docs/slo.md\`). Failing gates roll the canary back; passing ones promote it after the window. Design and thresholds: ADR-014.
 
 | Measured over ${V('release.badRuns')} bad-release and ${V('release.goodRuns')} good-release drills (simulated fleet, one fault kind) | Result | Field |
 |---|---|---|
@@ -125,7 +125,7 @@ ${table(['Requirement', 'Target', 'Measured', 'Field'], [
 Gateways act on a cached policy bundle and poll control in the background (ADR-004). If control is unreachable, low-risk calls continue; once the bundle is older than the staleness limit (${V('chaos.settings.bundleStaleAfterMs')} in these runs), high-risk tools are refused with \`STALE_POLICY_HIGH_RISK\`. No new identities or admissions are possible while control is down. Game days (\`make chaos\`, in-process, same machine as the benchmarks):
 
 ${table(['Game day', 'Result', 'Fields'], [
-  ['Control plane stopped, then restarted', `Low-risk success ratio ${M('control-plane-stop', 'lowRiskDuringOutage.ratio')}; high-risk denied after the bundle went stale: ${M('control-plane-stop', 'highRiskAfterStaleDeniedRatio')}; gateway marked it stale (MTTD) ${M('control-plane-stop', 'mttdMs')} after the stop; normal operation (MTTR) ${M('control-plane-stop', 'mttrMs')} after restart; new identity and admission refused during the outage.`, '`chaos.scenarios.control-plane-stop`'],
+  ['Control plane stopped, then restarted', `Low-risk success ratio ${M('control-plane-stop', 'lowRiskDuringOutage.ratio')}; high-risk denied after the bundle went stale: ${M('control-plane-stop', 'highRiskAfterStaleDeniedRatio')}; first high-risk fail-closed denial ${M('control-plane-stop', 'mttdMs')} after the stop (tracks the configured staleness limit, so not a detection measurement); first allowed high-risk call ${M('control-plane-stop', 'mttrMs')} after a scripted restart on localhost (not an operational repair time); new identity and admission refused during the outage.`, '`chaos.scenarios.control-plane-stop`'],
   ['Identity issuer fails', `Token TTL in this test ${M('identity-issuer-down', 'ttlMs')}; latest first denial ${M('identity-issuer-down', 'maxTimeToFirstDenialMs')} after the fault; calls allowed on an expired token ${M('identity-issuer-down', 'allowedAfterExpiryTotal')}; agents recovered without a restart.`, '`chaos.scenarios.identity-issuer-down`'],
   ['One of two gateway replicas killed', `Error rate after the loss: ${M('gateway-replica-loss', 'withoutFailover.errorRateAfterLoss')} without agent-side failover, ${M('gateway-replica-loss', 'withFailover.errorRateAfterLoss')} with it. **Finding:** the fleet had no failover and sent about half its calls to the dead replica; the fix retries the other replica only on connection refused.`, '`chaos.scenarios.gateway-replica-loss`'],
   ['Malformed or rejected policy bundle', `Lowest low-risk success ratio across four variants ${M('bad-policy-bundle', 'lowRiskSuccessMin')}; last good bundle kept in every variant: ${M('bad-policy-bundle', 'versionKeptInAllVariants')}. **Finding:** a well-formed but wrong-shaped bundle used to replace the good one and break the gateway; the gateway now validates the shape (\`services/gateway/src/app.ts\`, unit test in \`gateway.test.ts\`).`, '`chaos.scenarios.bad-policy-bundle`'],
@@ -140,7 +140,7 @@ The qualitative analysis is [\`docs/FMEA.md\`](../docs/FMEA.md) (copy: \`FMEA.md
 
 ## Capacity note
 
-The bench ran ${V('bench.requests')} at ${V('bench.concurrency')} on a machine with ${V('environment.cores')}, which also ran the load generator, the mock tools and control: ${V('bench.throughputRps')} through one gateway. The simulated fleet generates ${V('fleet.baselineCallsPerSec')}. This is a laptop-scale measurement, not a capacity plan. Production sizing needs a load test against a deployed gateway (the design names k6) and a decision on the production data plane (agentgateway, ADR-001). After one of two replicas dies, the survivor takes all the traffic; headroom per replica has not been measured.
+The bench ran ${V('bench.requests')} at ${V('bench.concurrency')} on a machine with ${V('environment.cores')}, which also ran the load generator, the mock tools and control: ${V('bench.throughputRps')} through one gateway. The simulated fleet generates ${V('fleet.baselineCallsPerSec')}. This is a laptop-scale measurement, not a capacity plan. A k6 open-model run (\`make k6\`) is recorded in impact.json \`bench.k6\`; it ran on the same machine with incident detection off (\`RC_TICK_MS=0\`), so it describes the decision path without the detector and is not a capacity figure either. Production sizing needs a load test against a deployed gateway with TLS and a network hop, and a decision on the production data plane (agentgateway, ADR-001). After one of two replicas dies, the survivor takes all the traffic; headroom per replica has not been measured.
 
 ## Licences of dependencies actually used
 

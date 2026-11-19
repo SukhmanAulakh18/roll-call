@@ -11,7 +11,7 @@ Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:34
 
 **Why now.** OSFI Guideline E-23 (model risk management) takes effect May 1, 2027. Our engineering reading is that it expects an accurate, evergreen model inventory with owners, approved uses and monitoring, including monitoring that the model stays within its approved scope. An agent fleet changes faster than a quarterly inventory refresh. This is an engineering interpretation, not compliance advice; the mapping is in `e23-mapping.md`.
 
-## Three numbers
+## Headline numbers
 
 | What | Result | Field in impact.json |
 |---|---|---|
@@ -20,7 +20,7 @@ Numbers are from the last recorded run: impact.json generatedAt 2026-11-19T15:34
 | Spend kept out per runaway drill, mean ($13.21 across all drills) | **$0.66** | `drill.spendProtectedUsd.protectedMean` |
 | Extra end-to-end latency, difference of two p99s (governed minus ungoverned), loopback, no TLS, single process. Not production latency. Zero or negative means within run-to-run noise | **-1.11 ms** | `bench.overheadP99Ms` |
 
-**Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In 8 drills with a faulty new version, 8 were rolled back automatically (p95 8578 ms from the first faulty call); 0 good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted error budget (ADR-014).
+**Release safety.** A new agent version runs as a canary beside the stable one and is judged on its own error rate and p99 against stable. In 8 drills with a faulty new version, 8 were rolled back automatically (p95 8578 ms from the moment the new version took traffic); 0 good releases were wrongly rolled back. Simulated fault, one agent, one fault kind. Promotion to production also needs passing evaluation evidence, drill regression, zero attack escapes and an unexhausted per-agent error budget, computed from an in-memory ledger (ADR-014).
 
 Also measured: 12 agents registered and 0 running without a record; detector precision 1.00 and recall 1.00 for HARD containment with 0 hard false alarms, at 3 runs per case (small and scripted); soft alerts, which only throttle gently, appeared in 6 of 9 negative-case runs; low-risk success ratio 1.00 while the control plane was stopped. Dollar amounts use price assumptions (`cost-model.md`), not real invoices.
 
@@ -28,7 +28,7 @@ Also measured: 12 agents registered and 0 running without a record; detector pre
 
 1. **The results are from simulation.** Agents are scripted and faults are injected by us. *Mitigation:* the 30-day pilot phase is read-only discovery on real traffic, so baselines come from real agents before any enforcement.
 2. **Failing closed has a business cost.** If the control plane is unreachable, high-risk tools are refused after the policy goes stale. *Mitigation:* low-risk work continued in the game day and high-risk calls were denied on purpose; the staleness limit is a setting the risk owner chooses (`docs/runbooks/control-plane-down.md`).
-3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged first. Measured hard false alarms are 0 on the labelled set (3 runs per case, small and synthetic), and soft alerts appeared in 6 of 9 negative-case runs; the pilot measures this on real traffic.
+3. **A false alarm throttles a healthy agent.** *Mitigation:* a single signal only soft-throttles; two independent signals are needed for hard containment, and the owner is paged before any kill (the pager and acknowledgement are simulated in this demo). Measured hard false alarms are 0 on the labelled set (3 runs per case, small and synthetic), and soft alerts appeared in 6 of 9 negative-case runs; the pilot measures this on real traffic.
 
 ## Build, buy or extend
 

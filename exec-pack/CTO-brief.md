@@ -8,7 +8,7 @@ Full diagrams: [`docs/architecture.md`](../docs/architecture.md). In short: a **
 
 ## Release gates and auto-rollback
 
-A version bump runs as a canary taking half of the agent's traffic under its own identity, so gateway events tell the two versions apart. Control judges it with `evaluatePromotion` (`services/control/src/lifecycle.ts`): evaluation evidence present, passed and fresh; drill regression; attack suite with zero escapes; canary error rate and p99 against stable; error budget not exhausted. Failing gates roll the canary back; passing ones promote it after the window. Design and thresholds: ADR-014.
+A version bump runs as a canary taking half of the agent's traffic under its own identity, so gateway events tell the two versions apart. Control judges it with `evaluatePromotion` (`services/control/src/lifecycle.ts`): evaluation evidence present, passed and fresh; drill regression; attack suite with zero escapes; canary error rate and p99 against stable; per-agent error budget not exhausted (in-memory ledger in control, not the Prometheus SLOs in `docs/slo.md`). Failing gates roll the canary back; passing ones promote it after the window. Design and thresholds: ADR-014.
 
 | Measured over 8 bad-release and 8 good-release drills (simulated fleet, one fault kind) | Result | Field |
 |---|---|---|
@@ -44,7 +44,7 @@ Gateways act on a cached policy bundle and poll control in the background (ADR-0
 
 | Game day | Result | Fields |
 |---|---|---|
-| Control plane stopped, then restarted | Low-risk success ratio 1.00; high-risk denied after the bundle went stale: 1.00; gateway marked it stale (MTTD) 2003 ms after the stop; normal operation (MTTR) 209 ms after restart; new identity and admission refused during the outage. | `chaos.scenarios.control-plane-stop` |
+| Control plane stopped, then restarted | Low-risk success ratio 1.00; high-risk denied after the bundle went stale: 1.00; first high-risk fail-closed denial 2003 ms after the stop (tracks the configured staleness limit, so not a detection measurement); first allowed high-risk call 209 ms after a scripted restart on localhost (not an operational repair time); new identity and admission refused during the outage. | `chaos.scenarios.control-plane-stop` |
 | Identity issuer fails | Token TTL in this test 3000 ms; latest first denial 2217 ms after the fault; calls allowed on an expired token 0; agents recovered without a restart. | `chaos.scenarios.identity-issuer-down` |
 | One of two gateway replicas killed | Error rate after the loss: 0.50 without agent-side failover, 0.00 with it. **Finding:** the fleet had no failover and sent about half its calls to the dead replica; the fix retries the other replica only on connection refused. | `chaos.scenarios.gateway-replica-loss` |
 | Malformed or rejected policy bundle | Lowest low-risk success ratio across four variants 1.00; last good bundle kept in every variant: true. **Finding:** a well-formed but wrong-shaped bundle used to replace the good one and break the gateway; the gateway now validates the shape (`services/gateway/src/app.ts`, unit test in `gateway.test.ts`). | `chaos.scenarios.bad-policy-bundle` |
@@ -58,7 +58,7 @@ The qualitative analysis is [`docs/FMEA.md`](../docs/FMEA.md) (copy: `FMEA.md`).
 
 ## Capacity note
 
-The bench ran 6000 requests at concurrency 16 on a machine with 4 cores, which also ran the load generator, the mock tools and control: 2699 req/s through one gateway. The simulated fleet generates 17 calls/s. This is a laptop-scale measurement, not a capacity plan. Production sizing needs a load test against a deployed gateway (the design names k6) and a decision on the production data plane (agentgateway, ADR-001). After one of two replicas dies, the survivor takes all the traffic; headroom per replica has not been measured.
+The bench ran 6000 requests at concurrency 16 on a machine with 4 cores, which also ran the load generator, the mock tools and control: 2699 req/s through one gateway. The simulated fleet generates 17 calls/s. This is a laptop-scale measurement, not a capacity plan. A k6 open-model run (`make k6`) is recorded in impact.json `bench.k6`; it ran on the same machine with incident detection off (`RC_TICK_MS=0`), so it describes the decision path without the detector and is not a capacity figure either. Production sizing needs a load test against a deployed gateway with TLS and a network hop, and a decision on the production data plane (agentgateway, ADR-001). After one of two replicas dies, the survivor takes all the traffic; headroom per replica has not been measured.
 
 ## Licences of dependencies actually used
 

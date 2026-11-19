@@ -1,6 +1,6 @@
 # SLOs, burn-rate alerts and the error-budget policy
 
-Targets below are targets. Measured values come from `impact.json` (`make bench`, `make k6`) or from the running Prometheus.
+Targets below are targets. Measured values come from `impact.json` (`make bench`, `make k6`) or from the running Prometheus. The `make k6` figures (`bench.k6`) were taken with incident detection off (`RC_TICK_MS=0`), over loopback with no TLS, on the same machine as the stack; they are not production latency.
 
 ## The five SLOs (source of truth: `slo/*.yaml`, OpenSLO v1)
 
@@ -24,7 +24,7 @@ Targets below are targets. Measured values come from `impact.json` (`make bench`
 
 ## Error-budget policy
 
-Policy only. Nothing enforces it yet.
+Policy only: nothing reads these Prometheus SLOs to freeze anything yet. Separately, the promotion gate in `services/control/src/lifecycle.ts` enforces a simpler per-agent error budget (99% of decisions allowed, from an in-memory ledger; ADR-014). That gate is real code, but it is not driven by the SLOs on this page.
 
 1. The signal is `slo:error_budget_remaining:ratio{slo=...}`: 1 untouched, 0 exhausted, below 0 overspent (30 d rolling).
 2. Any SLO at or below 0 **freezes promotions**: no agent moves shadow to canary or canary to production, and no gateway or policy-engine release ships, except changes whose only purpose is to restore that SLO. Kill, revoke and rollback are never frozen.
@@ -35,7 +35,7 @@ Policy only. Nothing enforces it yet.
 
 ## Running it
 
-`make observe` (compose profile `observability`): Prometheus on :9090 scrapes control and both gateways every 5 s and loads the rules; Grafana on :3000 has the provisioned dashboard "Roll Call — SLOs" (anonymous viewer, admin/admin, lab only). Plain `make compose-up` does not start them. Screenshot of a real run: `docs/img/grafana-slo.png`.
+`make observe` (compose profile `observability`): Prometheus on :9090 scrapes control and both gateways every 5 s and loads the rules; Grafana on :3000 has the provisioned dashboard "Roll Call — SLOs" (anonymous viewer, admin/admin, lab only). Plain `make compose-up` does not start them. Screenshot of a lab run against the simulated fleet: `docs/img/grafana-slo.png`.
 
 ## Metrics added
 

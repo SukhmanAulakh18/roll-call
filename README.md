@@ -13,7 +13,7 @@ The agents, tools and model responses are simulated. The controls are not. The g
 
 Roll Call builds on open-source work rather than replacing it:
 
-| Piece | Used for |
+| Piece | Design option for (not a dependency) |
 |---|---|
 | agentgateway | Production data-plane option for HTTP, MCP and LLM traffic (ADR-001) |
 | kagent | Kubernetes runtime for agents |
@@ -31,12 +31,12 @@ What Roll Call adds: **the control loop and the proof.** Detection, graded respo
 Requires Node 22 (the backend runs TypeScript directly, with no build step). Docker is optional.
 
 ```bash
-npm install            # dev tooling only: TypeScript and Node types
-make drill             # >= 20 runaway drills and detector set; writes impact.json
-make demo              # offline demo: stack and built UI on http://localhost:7100
+npm ci                 # dev tooling only: TypeScript, Node types, qrcode
+(cd ui && npm ci)      # UI build tooling and bundle dependencies
+make demo              # offline demo: builds the UI, serves stack and UI on http://localhost:7100
 ```
 
-`make drill` writes `impact.json`. Read the measured results there. This README does not state them.
+The committed `impact.json` holds the last recorded run, so `make demo` needs no drill first. To re-measure, run `make drill` (and `make drill-release`, `make bench`, `make chaos` as needed), then `make exec-pack` and `make print` so the briefs and leave-behind match. Read the measured results in `impact.json`. This README does not state them.
 
 To run the containers instead: `make compose-up`, then `make compose-down` to stop and remove volumes.
 
@@ -52,6 +52,7 @@ To run the containers instead: `make compose-up`, then `make compose-down` to st
 | `make ui` | UI dev server (talks to `make stack`) |
 | `make demo` | Build the UI and serve the offline demo on port 7100 |
 | `make drill` | At least 20 governed and ungoverned runaway drills, and the detector set; writes `impact.json` |
+| `make drill-release` | Bad-release (auto-rollback) and good-release (auto-promote) drills; writes only the `release` section of `impact.json`. One simulated fault kind |
 | `make bench` | Decision-path latency against the ungoverned baseline; writes `impact.json` |
 | `make chaos` | Five game days (control stop, issuer down, gateway loss, bad bundle, event backlog); writes the `chaos` section of `impact.json` |
 | `make exec-pack` | Render `exec-pack/` (briefs, verification matrix, threat model, E-23 mapping) from `impact.json` |
@@ -59,13 +60,16 @@ To run the containers instead: `make compose-up`, then `make compose-down` to st
 | `make replay` | Build a self-contained static Replay bundle in `dist-replay/` (open `#/replay`); `.github/workflows/pages.yml` publishes it to GitHub Pages so a QR code can open it on a phone |
 | `make compose-up` / `make compose-down` | Docker compose stack, up and down |
 | `make observe` | Compose plus Prometheus :9090 and Grafana :3000 (SLO dashboard); see `docs/slo.md` |
-| `make slo-test` | Generate burn-rate rules from `slo/*.yaml`, `promtool check` and unit test |
-| `make k6` | 60 s load test against `RC_TICK_MS=0 make stack`; merges `bench.k6` into impact.json |
-| `make kind-up` | kind cluster with the AgentRecord CRD and admission webhook (planned) |
-| `make admission-demo` | Try to run an unregistered agent in kind (planned) |
+| `make observe-otel` | `observe` plus an OTel collector that scrapes the same targets and remote-writes to Prometheus |
+| `make slo` | Generate Prometheus burn-rate rules from `slo/*.yaml` |
+| `make slo-test` | `make slo`, then `promtool check` and unit test of the alerts (Docker) |
+| `make k6` | 60 s open-model load test against a running `RC_TICK_MS=0 make stack`, which turns incident detection off; merges `bench.k6` into impact.json. Its numbers are for the decision path with detection disabled |
+| `make kind-up` | kind cluster with the AgentRecord CRD and admission webhook (see ADR-013 for what was exercised) |
+| `make admission-demo` | Try to run an unregistered agent in kind (see ADR-013) |
+| `make print` | A5 leave-behind (`print/leave-behind.pdf`, `.png`) and `print/pitch-numbers.md`, all from impact.json |
 | `make clean` | Remove `data` and `ui/dist` |
 
-The API is in `contracts/modules.md`. `make kind-up` and `make admission-demo` ran once against a real kube-apiserver; see ADR-013 for what was and was not exercised.
+The API is in `contracts/modules.md`. `make kind-up` and `make admission-demo` ran once against a real kube-apiserver: the CRD and the label check (ValidatingAdmissionPolicy) were exercised; the record-lookup webhook was not (ADR-013).
 
 ### How to read the numbers
 
@@ -76,6 +80,8 @@ Every figure comes from `impact.json`, written by a real run. Read them with the
 - **Time to contain** includes a simulated owner acknowledgement (the configured delay is stored as `drill.simulatedOwnerAckMs`). The automatic part, time to hard throttle and page, is `drill.stagesP95Ms.paged`. Percentiles are over the recorded `drill.runs`.
 - **Detector precision and recall** are for HARD containment only, with `detector.runsPerCase` runs per case. Soft alerts on negative cases are reported separately as `detector.softOnNegatives`.
 - A kill counts as proven only when an independent probe gets DENY with code REVOKED; otherwise the incident stage is `kill_unconfirmed`.
+- **k6 load figures** (`bench.k6`) were measured with incident detection off (`RC_TICK_MS=0`), because the detector would otherwise throttle the load as a runaway. Same loopback, no-TLS, one-machine caveat.
+- **Release drills** (`release`) inject one simulated fault kind (failing requests) into one agent; latency and scope regressions are gated but not drilled (ADR-014).
 - `/v1/direct` (the ungoverned baseline) is off unless `RC_DIRECT_BASELINE=1` (ADR-001).
 
 ## Repo map
@@ -91,7 +97,9 @@ Every figure comes from `impact.json`, written by a real run. Read them with the
 | `replay/` | Static Replay page source |
 | `tests/acceptance/` | Definition-of-Done tests |
 | `deploy/compose/` | Docker compose topology and image |
-| `deploy/k8s/` | Kubernetes manifests, CRD and admission (planned) |
+| `deploy/k8s/` | Kubernetes manifests, CRD and admission (ADR-013); Argo Rollouts design in `rollouts/` (not exercised) |
+| `deploy/observability/`, `slo/`, `k6/` | Prometheus, Grafana and OTel config; OpenSLO definitions; k6 load script |
+| `print/` | Leave-behind and pitch numbers, generated from impact.json |
 | `docs/` | Architecture, ADRs, runbooks, FMEA, availability model, latency budget |
 | `docs/adr/` | Architecture decision records, index in `docs/adr/README.md` |
 | `docs/runbooks/` | Operator runbooks for the main failure modes |
@@ -107,6 +115,7 @@ Start with `docs/architecture.md`, then `docs/adr/README.md`.
 - **The gateway is a reference, not a security boundary.** Production should use agentgateway or an equivalent (ADR-001).
 - **Receipts have no external anchor yet.** Tail truncation is not detected until chain heads are written to write-once storage (ADR-008).
 - **OpenTelemetry GenAI conventions are in Development status** at the last check, so telemetry names are isolated in an adapter (ADR-009).
+- **The OWASP agentic threat-model titles are provisional**, pending reconciliation with the official OWASP text.
 - **The E-23 mapping is an interpretation** of the guideline's inventory and model-risk expectations. It is not legal, regulatory or compliance advice.
 - **Not affiliated with or endorsed by any company or regulator named here.** Named projects are referenced, and each keeps its own licence.
 

@@ -22,6 +22,56 @@ Verdict tally (original review): 6 RESOLVED, 19 KNOWN LIMIT (25 questions). Afte
 Soft-alert finding: on a healthy steady-state fleet, a roughly 3-minute observation with no drill raised 0 incidents. The reviewer's single "cycle suspected" toast was not reproduced, so the cause (the cycle signal needs 3 calls per edge in 5 s, which legitimate agent-to-agent traffic can reach) is a hypothesis, not a measurement. In the scripted negatives, soft alerts did fire: see `detector.softOnNegatives` in impact.json. Thresholds were not changed. Toasts no longer fire for soft alerts.
 
 
+## Final check (Thu)
+
+Date: Thu 2026-11-19, before the feature freeze. Scope: everything that landed after the review above (promotion gates and canary auto-rollback, observability and SLOs, k6, print leave-behind, pitch kit, label fixes). impact.json generatedAt 2026-11-19T15:34:34.489Z, gitSha eebcee1. No code was changed in this check; wording only.
+
+Commands run in this check: `make verify` (80/80 PASS), `npm test` (40/40), `npm run test:acceptance` (7/7), `make slo-test` (promtool check and rule tests SUCCESS), `make exec-pack`, `make print`.
+
+**Fresh clone to running demo: 23 s.** Measured on the review machine (4 cores, Node 22.23.5): `git clone` into an empty folder, `npm ci`, `(cd ui && npm ci)` (9 s for both installs), `make demo` (UI build plus stack), then `curl http://localhost:7100/healthz` returned `{"ok":true,"bundleVersion":2}` and `/` returned 200 with the UI's index.html, 23 s after the clone started. The npm cache was warm; a cold cache adds download time on venue Wi-Fi, so do the install the night before. The clone was then stopped and deleted.
+
+### Definition of Done
+
+The build brief's section 14 is not in the repo. Items 2 to 8 are the numbered tests in `tests/acceptance/dod.test.ts`; items 1, 9 and 10 are taken from `docs/demo-script.md` and the README.
+
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| 1 | Fresh clone to running offline demo in under 10 minutes | MET (23 s, warm npm cache) | This section; `Makefile` `demo`; `docs/demo-script.md` checklist |
+| 2 | impact.json: at least 20 drill runs, spend kept out, contain p50/p95, detector counts | MET, with labels: contain includes a simulated owner ack; detector n = 3 per case; spend at assumed prices | `tests/acceptance/dod.test.ts` DoD2; impact.json `drill`, `detector` |
+| 3 | Kill with proof by an independent probe | MET; unproven kill shows as `kill_unconfirmed` | DoD3; ADR-006 |
+| 4 | Unregistered agent refused at admission with a readable reason | PARTIAL: met in control and in the UI; on Kubernetes only the label check (VAP) ran against a real API server, the record-lookup webhook did not | DoD4; ADR-013; `deploy/k8s/admission-demo.out.txt` |
+| 5 | Bench p50/p95/p99, throughput, overhead vs ungoverned | MET, loopback, no TLS, one machine; k6 run had detection off | DoD5; impact.json `bench`, `bench.k6` |
+| 6 | Static stability with control down | MET | DoD6; impact.json `chaos.scenarios.control-plane-stop` |
+| 7 | Receipts verify and tampering is found at the exact record | MET; no external anchor, so tail truncation is not detected | DoD7; `make verify` tamper test; ADR-008 |
+| 8 | Bad release rolled back automatically, good release promoted | MET; one simulated fault kind on one agent | DoD8; impact.json `release` (8 of 8, 0 false rollbacks); ADR-014 |
+| 9 | Every number in the briefs traces to impact.json, labelled; `make verify` passes | MET | `make verify` check 5 (74 claims), `exec-pack/verification-matrix.csv`, `print/pitch-numbers.md` |
+| 10 | SLOs with burn-rate alerts and a dashboard | MET for rules, alert tests and dashboard; the error-budget freeze from Prometheus is policy only | `make slo-test`; `docs/slo.md`; `docs/img/grafana-slo.png` |
+
+### Wording fixed in this check
+
+- README: quickstart now `npm ci`, `(cd ui && npm ci)`, `make demo` (the old `npm install` plus `make drill` path skipped the UI install); make-targets table now lists `drill-release`, `observe-otel`, `slo`, `print`; `kind-up`/`admission-demo` no longer say "planned" and say what ran; k6 and release-drill caveats added; Positioning column renamed "Design option for (not a dependency)"; OWASP titles flagged as provisional.
+- CEO brief: "Three numbers" table (it had four rows) renamed; rollback time measured "from the moment the new version took traffic" (matches `release.definition`), not "from the first faulty call"; "owner is paged first" now says the pager is simulated; error budget described as per-agent and in-memory.
+- CTO brief: control-stop timings no longer labelled MTTD/MTTR as if operational; capacity note mentions the k6 run with detection off.
+- `docs/slo.md`: says which error budget is enforced (per-agent gate in `lifecycle.ts`) and which is not (Prometheus SLO freeze); k6 caveat; screenshot labelled as a lab run on the simulated fleet.
+- `docs/pitch.md`: openers rephrased as "Roll Call shows ..."; "Borealis platform" removed from a heading (no claims about any company's systems); overhead line uses the generated spoken form; admission caveat (ADR-013); release-drill limit added.
+- `docs/demo-script.md`: the navigation label is **Admission** (page title Admission playground); Fleet sentence quoted as on screen; Tour and Bad release paths added; checklist adds `(cd ui && npm ci)`.
+- Leave-behind: "What does each one cost, and what value?" became "What does each one cost?" with "value is not measured".
+
+Stale points in the review above, now superseded: Q9 says "no k6 run" (one exists, with detection off, `bench.k6`); Q13 and C13 said the README called `kind-up` "planned" (fixed).
+
+### Remaining KNOWN LIMITs
+
+Simulated fleet and synthetic drills; detector n = 3 per case with soft alerts on 6 of 9 negative runs and ping-pong collateral every run; time to contain includes a 1 s simulated owner ack; overhead and k6 figures are loopback, no TLS, one machine, and k6 ran with detection off; release drill covers one fault kind on one agent; per-gateway budget windows (N replicas means up to N times the budget); single symmetric token secret with a dev fallback; receipts have no external anchor; probe proves denial only at known gateways (no network egress control); no prompt-injection defence; nobody can kill during a control outage; Kubernetes webhook not exercised; Prometheus error-budget freeze not enforced; E-23 mapping is an interpretation and the inventory-field mapping is not done; OWASP titles not reconciled; licences TBD and no LICENSE file; value per agent not measured; prices are assumptions.
+
+### Five things the presenter must say out loud
+
+1. "The fleet is simulated. The controls are real code, and every number on screen comes from a recorded run."
+2. "Time to contain includes a simulated one-second owner acknowledgement. The automatic part is the throttle-and-page time."
+3. "The latency figure is end to end on one laptop, loopback, no TLS. It is not production latency."
+4. "Detector results are three scripted runs per case, hard containment only, and soft alerts did fire on healthy cases."
+5. "Dollar figures use assumed prices. This is not affiliated with or endorsed by any bank, telco or regulator, and the E-23 page is an engineering interpretation, not compliance advice."
+
+
 ---
 
 ## 1. The 25 hardest questions

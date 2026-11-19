@@ -22,14 +22,16 @@ Use the Executive lens. Each step names the on-screen control.
 
 | Time | Click path | Say (see docs/pitch.md) |
 |---|---|---|
-| 0:00 to 0:05 | **Fleet** (home). The sentence at the top of the page is on screen. | Read it aloud: "Roll Call watches a bank's AI agents and can stop one that goes wrong, with proof." |
+| 0:00 to 0:05 | **Fleet** (home). The sentence at the top of the page is on screen. | Read it aloud: "Roll Call watches a bank's AI agents (software workers) and can stop one that goes wrong, with proof." The fleet is simulated. |
 | 0:05 to 0:13 | Point left to right at the four tiles: **What agents exist?**, **What does it cost?**, **Can I stop one, fast?**, **Can I prove it?** | "What agents exist, what it costs, can I stop one, and can I prove it." |
 | 0:13 to 0:16 | Press **Run a drill**. It opens **Drill** and starts the runaway-loop race. | "Same fault, with and without controls." |
 | 0:16 to 0:28 | Watch the two race charts and the steps: **Detect**, **Throttle**, **Page**, **Owner ack**, **Kill**, **Proof**. Wait for **Proof** to show the probe refused. | "Detect, throttle, page, kill, proof. The owner acknowledgement is simulated (`owner_ack_simulated`)." |
 | 0:28 to 0:33 | Go back to **Fleet**. On the **Can I stop one, fast?** tile, press **Verify**. | Point at the field, the last-run time and the command that reproduces it. "Every number has a source." |
-| 0:33 to 0:40 | Close the sheet. Press **Admission playground** in the navigation. Keep the preset **Unregistered shadow-bot** and press **Try to deploy**. | "Rejected at the gate, with a reason. Nothing unregistered runs." |
+| 0:33 to 0:40 | Close the sheet. Press **Admission** in the navigation (the page is titled **Admission playground**). Keep the preset **Unregistered shadow-bot** and press **Try to deploy**. | "Rejected at the gate, with a reason. Nothing unregistered runs." |
 
 If the drill does not reach **Proof** within about 15 seconds, say so and move on. Do not wait on the screen.
+
+Hands-free alternative: **Tour** in the top bar plays the same path in five steps (about 40 seconds: four questions, Verify, runaway drill, proof, admission). Arrow keys step, **p** pauses, Escape ends it.
 
 ## The 3-minute version
 
@@ -41,9 +43,11 @@ Start with the 40-second path. Then continue:
 | 1:10 to 1:40 | **Drill**: when the ping-pong run ends, press **Replay the race side by side** if it is offered. For the runaway run, read the spend line under the chart. | "Spend kept out at assumed prices. The prices are assumptions." |
 | 1:40 to 2:10 | Switch the lens to **Engineering**, or open **Engineering** in the navigation. Press **Verify** on the overhead or detector tile. | "Overhead is an end-to-end difference, on one laptop, with no TLS. Detector figures are hard containment on small runs." |
 | 2:10 to 2:35 | **Spend and value** shows the budgets per agent. **Registry** shows owners, scopes and risk ratings. Owner names are fictional. | "Budgets are enforced at the gateway on every call. Owners are fictional." |
-| 2:35 to 3:00 | **Fleet**. Close with the four limits from `docs/pitch.md`, then the 30/60/90-day pilot. | "The fleet is simulated, the controls are real. Here is what a pilot would look like." |
+| 2:35 to 3:00 | **Fleet**. Close with the first four honest limits from `docs/pitch.md`, then the 30/60/90-day pilot. | "The fleet is simulated, the controls are real. Here is what a pilot would look like." |
 
-Check **Engineering** and **Replay** on the rehearsal build before the demo. Earlier reviews found those screens failed in real mode. If either is broken, skip it and say nothing about it.
+Optional, if someone asks about releases: on **Drill**, pick **Bad release** and press **Run bad release**. The **Promotion gates** panel fails the canary and it is rolled back with no human. Its measured time is `release.timeToRollbackMs` in impact.json; say it is one simulated fault kind on one agent. **Good release** is the control case and is promoted. Each run takes several seconds, so do not use it in the 40-second path.
+
+Check **Engineering** and **Replay** on the rehearsal build before the demo. An earlier review found those screens failed in real mode; both were fixed (see `exec-pack/exec-review.md`), but check anyway. If either is broken, skip it and say nothing about it.
 
 ## If the Wi-Fi is down
 
@@ -59,7 +63,7 @@ Everything in the demo runs locally, so the path works with no network if `make 
 
 Target: a presenter can go from a fresh clone to a running demo in under 10 minutes.
 
-- [ ] Clone the repository into an empty folder. Run `npm ci` and confirm it finishes without errors. (`qrcode` is pinned in devDependencies.)
+- [ ] Clone the repository into an empty folder. Run `npm ci`, then `(cd ui && npm ci)`, and confirm both finish without errors. (`qrcode` is pinned in devDependencies.)
 - [ ] Optional: run `make drill`. If you run it, run `make print` afterwards so the leave-behind and `print/pitch-numbers.md` match the new `impact.json`.
 - [ ] Run `make demo`. Time it from the clone step to the first page at http://localhost:7100. It must finish in under 10 minutes.
 - [ ] Offline test: turn Wi-Fi off, reload http://localhost:7100, and walk the 40-second path. Check Verify, Admission and Reset fleet. Turn Wi-Fi back on.
