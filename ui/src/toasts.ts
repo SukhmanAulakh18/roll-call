@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { useStore } from './store';
+import { getState, useStore } from './store';
 import { ownerShort } from './ui';
 
 // toasts for incident stages (global, mounted once in the shell)
@@ -14,6 +14,7 @@ export function useIncidentToasts() {
       const k = `${e.incidentId}:${e.stage}`;
       if (seen.current.has(k)) continue;
       seen.current.add(k);
+      if (getState().source === 'replay') continue; // the recording is on screen; no pop-ups
       const a = agents.find((x) => x.id === e.agentId);
       const who = a ? ownerShort(a.owner.name) : 'the owner';
       // Toast only hard containment. Soft alerts show quietly on the agent's node (state 'alert').

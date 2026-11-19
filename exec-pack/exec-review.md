@@ -5,7 +5,22 @@ Inputs: README.md, exec-pack/*, docs/* (architecture, ADR-001 to ADR-013, FMEA, 
 
 Overall: the engineering honesty is well above the norm. Limits are stated, assumptions are labelled, every brief number traces to an impact.json field, and the chaos game days found and fixed two real defects. The weak spots are (a) a few numbers whose labels promise more than the measurement does, (b) three places where the code does not do what the ADR/FMEA says it does, and (c) two demo-breaking UI bugs in real mode that the existing screenshots (taken in fixture mode) did not catch.
 
-Verdict tally: **6 RESOLVED, 19 KNOWN LIMIT** (25 questions).
+Verdict tally (original review): 6 RESOLVED, 19 KNOWN LIMIT (25 questions). After the fixes below: **8 RESOLVED, 17 KNOWN LIMIT** (Q15 and Q18 moved). Everything not listed in the status section stays a KNOWN LIMIT.
+
+## Status after fixes
+
+| Item | Status | Commit |
+|---|---|---|
+| Top fix 1: Engineering lens/page crash in real mode (per-case table, fixture matches real shape, error boundary with Reset view, shape test) | RESOLVED | 98ec85e |
+| Top fix 2: Replay in real mode (control serves `/replay/*`, `make replay` builds `dist-replay/`, Pages workflow) and C13 replay part | RESOLVED | 1d94bac |
+| Top fix 3: demo boots dirty (`serve.ts` resets fleet unless `--keep-state`); alert toasts only for hard containment | RESOLVED | ce3c699, 157573e |
+| Top fix 4 and C1, C2, C4, C5, C6, C16: honest labels in UI, README and generated exec-pack; soft-alert count on negatives measured by a real `make drill`; "95 of 100" copy removed | RESOLVED | 5c20ef8, 8cf416e, 7a90631 |
+| Top fix 5, Q15, C9, C10, C11: unproven kill is `kill_unconfirmed` (502, loud in UI, not counted as contained; unit tests) | RESOLVED | 65c8de5, 157573e |
+| Q18: `/v1/direct` off unless `directEnabled` / `RC_DIRECT_BASELINE=1`; documented in ADR-001 | RESOLVED (network-level enforcement is still a KNOWN LIMIT) | 157573e |
+| 5-second test: plain sentence, Run a drill button, shorter map on home | RESOLVED | 9551603 |
+
+Soft-alert finding: on a healthy steady-state fleet, a roughly 3-minute observation with no drill raised 0 incidents. The reviewer's single "cycle suspected" toast was not reproduced, so the cause (the cycle signal needs 3 calls per edge in 5 s, which legitimate agent-to-agent traffic can reach) is a hypothesis, not a measurement. In the scripted negatives, soft alerts did fire: see `detector.softOnNegatives` in impact.json. Thresholds were not changed. Toasts no longer fire for soft alerts.
+
 
 ---
 
@@ -96,7 +111,7 @@ Answer: An independent probe (its own HTTP path) replays the agent's last tool c
 3. If the agent's old token has under 3 s left, the probe mints a new 15 s token for the agent, but the message still says "with the agent's old token".
 It also proves denial at the gateways the control plane knows about; it does not prove the process cannot reach a tool directly.
 Evidence: `services/control/src/engine.ts` lines 113 to 150, `sim/drills.ts` line 44, ADR-006, FMEA row 10, `tests/acceptance/dod.test.ts` DoD3.
-Verdict: **KNOWN LIMIT**. The fix is about 10 lines: emit `unproven` instead of `proof` unless the verdict is deny/REVOKED.
+Verdict: **RESOLVED** in 65c8de5 (stage `kill_unconfirmed`, not counted as contained). KNOWN LIMIT that remains: the probe proves denial at the gateways the control plane knows about, not that the process cannot reach a tool directly.
 
 **Q16. What stops goal hijack?**
 Answer: Nothing prevents it; it is bounded. Per-agent tool and model allow-lists, budgets, throttles and the scope-drift detector limit what a hijacked agent can do. There is no prompt-level injection defence, and the threat model says so.
@@ -111,7 +126,7 @@ Verdict: **KNOWN LIMIT**. Show it live, then say the anchor sentence before the 
 **Q18. Can an agent bypass the gateway?**
 Answer: In the demo, yes, by design: the gateway serves `POST /v1/direct`, which skips identity, scope, budget, throttle and masking. It is used to run the ungoverned baseline. It has no flag or authentication and ships in the same service as the governed path. In production nothing in the repo enforces "only through the gateway" at the network layer (no NetworkPolicy, no egress control).
 Evidence: `services/gateway/src/app.ts` lines 146 to 161.
-Verdict: **KNOWN LIMIT**. Put `/v1/direct` behind an explicit `--allow-ungoverned` flag and say so in the threat model.
+Verdict: **RESOLVED** in 157573e for the flag (`/v1/direct` is 404 unless enabled). KNOWN LIMIT that remains: nothing enforces gateway-only egress at the network layer.
 
 ### Skeptical Head of Model Risk
 
@@ -160,22 +175,22 @@ Every number in README.md, exec-pack/*.md and the UI hero row (`ui/src/screens/F
 
 | # | Claim (where) | Problem | Type |
 |---|---|---|---|
-| C1 | "Added decision latency at p99, 0.87 ms" (CEO-brief); "Gateway decision overhead vs ungoverned, p99" (verification-matrix); UI Engineering lens tile "Decision-path time with controls minus the ungoverned baseline" | `overheadP99Ms` is end-to-end p99 governed minus end-to-end p99 direct (`scripts/bench.ts` line 33). It is not decision latency, and it is a difference of p99s. Loopback, no TLS, no network, generator on the same 4 cores. CTO-brief labels it correctly ("end to end"); the CEO brief, the matrix and the UI do not. | Misleading |
-| C2 | "Gateway decision path p99 0.0901 ms" (CTO-brief) | An in-process timer around the decision code. Four significant figures imply precision a laptop timer does not have. No caveat that it excludes I/O, TLS and serialisation. | Overstated precision |
+| C1 (RESOLVED 5c20ef8) | "Added decision latency at p99, 0.87 ms" (CEO-brief); "Gateway decision overhead vs ungoverned, p99" (verification-matrix); UI Engineering lens tile "Decision-path time with controls minus the ungoverned baseline" | `overheadP99Ms` is end-to-end p99 governed minus end-to-end p99 direct (`scripts/bench.ts` line 33). It is not decision latency, and it is a difference of p99s. Loopback, no TLS, no network, generator on the same 4 cores. CTO-brief labels it correctly ("end to end"); the CEO brief, the matrix and the UI do not. | Misleading |
+| C2 (RESOLVED 5c20ef8) | "Gateway decision path p99 0.0901 ms" (CTO-brief) | An in-process timer around the decision code. Four significant figures imply precision a laptop timer does not have. No caveat that it excludes I/O, TLS and serialisation. | Overstated precision |
 | C3 | "Spend kept out per runaway drill $0.66", "$13.21 across all drills" (CEO-brief, UI hero "kept out of runaway drills") | Correctly labelled as assumed prices, but $13.21 sits under "What does it cost?" on the home screen, inviting a reading as savings. It is 20 x 12 s synthetic windows. The executive-relevant number (about $210 per runaway-hour at these prices) is not stated. | Misleading by framing |
-| C4 | "Time to contain p95 2225 ms" (CEO-brief, CTO-brief, UI hero "2.2 s") | About 1000 ms of it is a simulated owner auto-ack (`ackMs` default 1000; stages: detected 752, owner_ack 1997, killed 1999, proof 2225). The automatic part (detect and throttle) is 0.75 s. A real human page would take minutes. The figure is "time to contain with a 1-second fake human". | Misleading without caveat |
-| C5 | UI Verify sheet: "95 of 100 runs were this quick or quicker" | There were 20 runs. p95 of 20 samples is essentially the second-slowest run. | Wrong |
-| C6 | "detector precision 1.00 and recall 1.00 with 0 false alarms" (CEO-brief); "Does the detector cry wolf? 1.00" (UI eng lens) | n = 3 per case (9 positives, 9 negatives). "False alarm" counts only hard containment; soft alerts fired on 6 of 6 healthy-burst and slow-repeat runs. Every ping-pong run caused a collateral incident on another agent (`collateral: 3`), unreported in the briefs. A healthy fleet raised a soft alert during my session. | Overstated |
+| C4 (RESOLVED 5c20ef8) | "Time to contain p95 2225 ms" (CEO-brief, CTO-brief, UI hero "2.2 s") | About 1000 ms of it is a simulated owner auto-ack (`ackMs` default 1000; stages: detected 752, owner_ack 1997, killed 1999, proof 2225). The automatic part (detect and throttle) is 0.75 s. A real human page would take minutes. The figure is "time to contain with a 1-second fake human". | Misleading without caveat |
+| C5 (RESOLVED 5c20ef8) | UI Verify sheet: "95 of 100 runs were this quick or quicker" | There were 20 runs. p95 of 20 samples is essentially the second-slowest run. | Wrong |
+| C6 (RESOLVED 5c20ef8, 8cf416e) | "detector precision 1.00 and recall 1.00 with 0 false alarms" (CEO-brief); "Does the detector cry wolf? 1.00" (UI eng lens) | n = 3 per case (9 positives, 9 negatives). "False alarm" counts only hard containment; soft alerts fired on 6 of 6 healthy-burst and slow-repeat runs. Every ping-pong run caused a collateral incident on another agent (`collateral: 3`), unreported in the briefs. A healthy fleet raised a soft alert during my session. | Overstated |
 | C7 | "12 agents registered and 0 running without a record" (CEO-brief) | True but close to tautological: the simulated runtime only starts registered agents. The real evidence for "nothing unregistered runs" is the admission test (DoD4) and the VAP run, not this counter. In my live session the hero read "11 of 12" before any drill because a revocation from an earlier run persisted in `data/registry.json`. | Weak evidence |
 | C8 | "MTTD 2008 ms", "MTTR 13 ms" (CTO-brief, control-plane stop) | MTTD equals the configured staleness limit (2000 ms) plus poll jitter; it is a setting, not a detection measurement. MTTR is the time for a gateway on localhost to fetch a fresh bundle after control was restarted by a script. Neither is an operational MTTD/MTTR (no human, no alerting, no restart time). | Misleading labels |
-| C9 | FMEA row 10: "Incident stays at killed without proof", "timeToContainMs null otherwise"; ADR-006: "If the probe is not denied, the incident stays open and pages a human" | Not what the code does (Q15). An unproven kill emits a `proof` stage and counts as contained. | Unsupported by code |
-| C10 | Probe message "replayed ... with the agent's old token" (UI drill, incident banner) | `engine.ts` mints a fresh 15 s token when the old one has under 3 s left. | Sometimes false |
-| C11 | Kill message "runtime ... stopped" | Printed after `Promise.race` with a 2 s sleep, whether or not stop completed. | Unsupported |
+| C9 (RESOLVED 65c8de5) | FMEA row 10: "Incident stays at killed without proof", "timeToContainMs null otherwise"; ADR-006: "If the probe is not denied, the incident stays open and pages a human" | Not what the code does (Q15). An unproven kill emits a `proof` stage and counts as contained. | Unsupported by code |
+| C10 (RESOLVED 65c8de5) | Probe message "replayed ... with the agent's old token" (UI drill, incident banner) | `engine.ts` mints a fresh 15 s token when the old one has under 3 s left. | Sometimes false |
+| C11 (RESOLVED 65c8de5) | Kill message "runtime ... stopped" | Printed after `Promise.race` with a 2 s sleep, whether or not stop completed. | Unsupported |
 | C12 | UI live spend "$0.30 to $0.68 per min" vs `impact.json fleet.baselineSpendPerMinUsd` 0.0751 | A 4x to 9x gap between the live hero and the recorded baseline, unexplained. A sharp analyst will compare them. | Inconsistent |
 | C13 | README: "Status: the code is still being built. Several targets depend on files that do not exist yet"; `kind-up` and `admission-demo` "(planned)" | Stale: deploy/k8s exists and ran. But `make replay` calls `scripts/replay.ts`, which does not exist, and the UI's Replay empty state tells users to run it. | Stale / broken |
 | C14 | README licence table all "TBD"; ADR-001 "agentgateway (Apache 2.0)", ADR-002 "AGT (MIT)" | Inconsistent; no LICENSE file for Roll Call itself. | Unsupported |
 | C15 | `docs/adr/README.md` index | Lists ADR-001 to ADR-012; ADR-013 (admission) exists but is missing from the index. | Stale |
-| C16 | "Owner is paged first" (CEO-brief risk 3) | The page and the owner acknowledgement are simulated (impact.json `assumptions.simulatedPager` says so; the brief does not, at that point). | Needs caveat |
+| C16 (RESOLVED 7a90631) | "Owner is paged first" (CEO-brief risk 3) | The page and the owner acknowledgement are simulated (impact.json `assumptions.simulatedPager` says so; the brief does not, at that point). | Needs caveat |
 
 ### Real companies, affiliation and real-data flags
 

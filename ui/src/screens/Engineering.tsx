@@ -102,12 +102,12 @@ export function Engineering() {
     xAxis: { type: 'category', data: ['p50', 'p95', 'p99'], axisLabel: { color: p.ink2 }, axisLine: { lineStyle: { color: p.rule2 } } },
     yAxis: { type: 'value', name: 'ms', nameTextStyle: { color: p.muted }, axisLabel: { color: p.muted }, splitLine: { lineStyle: { color: p.rule } } },
     series: [
-      { name: 'Ungoverned baseline', type: 'bar', data: ['p50', 'p95', 'p99'].map((k) => b.direct?.[k] ?? null), itemStyle: { color: p.rule2, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 36, label: { show: true, position: 'top', color: p.muted, fontFamily: p.mono } },
-      { name: 'With Roll Call', type: 'bar', data: ['p50', 'p95', 'p99'].map((k) => b.governed?.[k] ?? null), itemStyle: { color: p.cool, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 36, label: { show: true, position: 'top', color: p.ink, fontFamily: p.mono } },
+      { name: 'Ungoverned baseline', type: 'bar', data: ['p50', 'p95', 'p99'].map((k) => b.direct?.[k] ?? null), itemStyle: { color: p.rule2, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 36, label: { show: true, position: 'top', color: p.muted, fontFamily: p.mono, formatter: (q: { value: number }) => `${Number(q.value.toPrecision(2))}` } },
+      { name: 'With Roll Call', type: 'bar', data: ['p50', 'p95', 'p99'].map((k) => b.governed?.[k] ?? null), itemStyle: { color: p.cool, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 36, label: { show: true, position: 'top', color: p.ink, fontFamily: p.mono, formatter: (q: { value: number }) => `${Number(q.value.toPrecision(2))}` } },
     ],
     tooltip: { ...(baseOption(p).tooltip as object), valueFormatter: (v: number) => `${v} ms` },
   }) : null, [b, p]);
-  const lbl = (x: unknown) => (isNum(x) ? `${x}` : '—');
+  const lbl = (x: unknown) => (isNum(x) ? `${Number(x.toPrecision(3))}` : '—'); // 3 significant digits: a laptop timer has no more
   return (
     <div className="eng">
       <header className="page-h"><div><h1>Engineering</h1><p className="lead">What control costs in latency, how much of each budget is used, and how a call is decided.</p></div>{source === 'fixture' && <FixtureChip />}</header>

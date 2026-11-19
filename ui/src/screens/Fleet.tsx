@@ -101,7 +101,7 @@ export function Hero() {
     </Tile>
   );
   const eng1 = (
-    <Tile q="What does control cost in latency?" verify={{ title: 'Overhead at p99', what: 'Difference of two end-to-end p99s: with controls minus the ungoverned baseline. Measured over loopback, plain HTTP, no TLS, in one process on one machine. Not production latency. The in-process decision-path p99 is a separate, smaller number.', field: 'bench.overheadP99Ms', shown: isNum(b?.overheadP99Ms) ? `${b.overheadP99Ms} ms` : 'not measured yet', kind: 'measured', command: b?.command ?? 'make bench' }} note={isNum(b?.throughputRps) ? <><span className="measured">{b.throughputRps}</span> requests per second (loopback, no TLS, not production latency)</> : <NotMeasured cmd="make bench" />}>
+    <Tile q="What does control cost in latency?" verify={{ title: 'Overhead at p99', what: 'Difference of two end-to-end p99s: with controls minus the ungoverned baseline. Measured over loopback, plain HTTP, no TLS, in one process on one machine. Not production latency. The in-process decision-path p99 is a separate, smaller number.', field: 'bench.overheadP99Ms', shown: isNum(b?.overheadP99Ms) ? `${b.overheadP99Ms} ms` : 'not measured yet', kind: 'measured', command: b?.command ?? 'make bench' }} note={isNum(b?.throughputRps) ? <><span className="measured">{Math.round(b.throughputRps)}</span> requests per second (loopback, no TLS, not production latency)</> : <NotMeasured cmd="make bench" />}>
       {isNum(b?.overheadP99Ms) ? <><CountUp value={b.overheadP99Ms} format={(n) => n.toFixed(1)} /><span className="reading-unit"> ms, end-to-end p99 difference</span></> : <span className="reading-na">no data</span>}
     </Tile>
   );
