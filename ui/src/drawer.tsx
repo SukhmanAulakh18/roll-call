@@ -139,7 +139,7 @@ export function ReceiptDrawer({ a, onClose, onBack, fixed }: { a: ActionEvent; o
           <div><dt>Agent</dt><dd><button type="button" className="linklike" onClick={() => openAgent(a.agentId)}>{agent?.name ?? a.agentId}</button></dd></div>
           <div><dt>Tool</dt><dd className="measured">{a.tool}{a.targetAgentId ? ` to ${a.targetAgentId}` : ''}</dd></div>
           <div><dt>When</dt><dd className="measured">{new Date(a.ts).toLocaleString()}</dd></div>
-          <div><dt>Cost, decision time</dt><dd className="measured">{usd(a.costUsd, 4)}, {a.latencyMs} ms</dd></div>
+          <div><dt>Cost, decision time</dt><dd className="measured">{usd(a.costUsd, 4)}, {a.latencyMs < 1 ? a.latencyMs.toFixed(3) : a.latencyMs.toFixed(1)} ms</dd></div>
           <div><dt>Gateway</dt><dd className="measured">{a.gatewayId}</dd></div>
           <div><dt>Arguments hash</dt><dd className="measured wrap">{a.argsHash}</dd></div>
         </dl>
