@@ -47,7 +47,7 @@ export function createRegistry(dataDir: string, seed: AgentRecord[]): Registry {
     reset() { load(seed); revoked = {}; throttles.clear(); bump(); },
     bundle(now, staleAfterMs = 2000) {
       const agents: PolicyBundle['agents'] = {};
-      for (const r of records.values()) agents[r.id] = { id: r.id, riskRating: r.riskRating, lifecycleState: r.lifecycleState, scopes: r.scopes, models: r.models, budgets: r.budgets };
+      for (const r of records.values()) agents[r.id] = { id: r.id, riskRating: r.riskRating, lifecycleState: r.lifecycleState, scopes: r.scopes, models: r.models, budgets: r.budgets, argLimits: r.argLimits };
       return { version, issuedAt: now, agents, revoked: { ...revoked }, throttles: Object.fromEntries(throttles), highRiskTools: HIGH_RISK_TOOLS, prices: PRICES, staleAfterMs };
     },
   };

@@ -8,10 +8,12 @@ import { closeServer, createRouter, fail, listen, ok, send } from '../../lib/htt
 import { defaultPolicy } from './policy.ts';
 import type { Decision, PolicyEngine } from './policy.ts';
 import { createReceiptWriter } from './receipts.ts';
+import { SIG_HEADER, signToolCall } from '../../lib/toolsig.ts';
 
 export interface GatewayOpts {
   port?: number; host?: string; controlUrl: string; toolsUrl: string; gatewayId: string; dataDir: string;
   pollMs?: number; policy?: PolicyEngine; maxQueue?: number;
+  toolSecret?: string;       // HMAC secret shared with the tools (default env ROLLCALL_TOOL_SECRET, else the dev default)
   directEnabled?: boolean;   // serve the ungoverned /v1/direct baseline. Default: env RC_DIRECT_BASELINE=1, else off (404). ADR-001.
 }
 /** ADR-001 interface. setPolicy/kill arrive via the polled bundle (revocation, throttles), not by direct calls. */
@@ -98,7 +100,8 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
 
   async function callTool(tool: string, req: ActRequest, args: unknown): Promise<{ result?: any; error?: string }> {
     try {
-      const r = await fetch(`${opts.toolsUrl}/tool/${encodeURIComponent(tool)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agentId: req.agentId, args, model: req.model, targetAgentId: req.targetAgentId }), signal: AbortSignal.timeout(5000) });
+      const body = { agentId: req.agentId, args, model: req.model, targetAgentId: req.targetAgentId };
+      const r = await fetch(`${opts.toolsUrl}/tool/${encodeURIComponent(tool)}`, { method: 'POST', headers: { 'content-type': 'application/json', [SIG_HEADER]: signToolCall(tool, JSON.parse(JSON.stringify(body)), opts.toolSecret) }, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
       if (!r.ok) return { error: `tool returned ${r.status}` };
       return { result: await r.json() };
     } catch (e) { return { error: (e as Error).message }; }
@@ -118,7 +121,7 @@ export async function startGateway(opts: GatewayOpts): Promise<Gateway> {
     else {
       const task = `${req.agentId}:${req.taskId ?? ''}`;
       d = policy.evaluate({
-        agentId: req.agentId, tool: req.tool, model: req.model, bundle, bundleAgeMs: now - lastFresh, estCostUsd: bundle?.prices[req.tool] ?? 0,
+        agentId: req.agentId, tool: req.tool, model: req.model, args: req.args, bundle, bundleAgeMs: now - lastFresh, estCostUsd: bundle?.prices[req.tool] ?? 0,
         spend: { hourUsd: spendOf(win.hour, req.agentId, 3_600_000, now), dayUsd: spendOf(win.day, req.agentId, 86_400_000, now), taskUsd: tasks.get(task) ?? 0 },
         takeToken: () => takeToken(req.agentId, now),
       });

@@ -66,3 +66,9 @@ video: ## record the real demo flow to docs/media/roll-call-demo.mp4 (run with `
 	NODE_PATH=$$(npm root -g) $(NODE) scripts/record-demo.cjs
 tour: ## record a full walkthrough of the live app to docs/media/roll-call-tour.mp4 (run with `make demo` up)
 	NODE_PATH=$$(npm root -g) $(NODE) scripts/record-tour.cjs
+
+.PHONY: external-demo containment
+external-demo: ## genuine external agent (own OS process) is throttled, paged and killed; every retry denied -> impact.json external + replay/external-events.json
+	$(NODE) scripts/external-demo.ts
+containment: ## harder containment tests (concurrency, replay, bypass, in-flight, restart, arg tampering, false positives) -> impact.json containment, docs/containment.md table
+	$(NODE) scripts/containment.ts

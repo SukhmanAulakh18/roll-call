@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import { canonicalJSON, sha256 } from '../services/lib/hash.ts';
 import { closeServer, createRouter, fail, listen, ok } from '../services/lib/http.ts';
+import { SIG_HEADER, verifyToolSig } from '../services/lib/toolsig.ts';
 
 const LLM = JSON.parse(readFileSync(new URL('./recorded-llm.json', import.meta.url), 'utf8')).completions as
   { id: string; text: string; inputTokens: number; outputTokens: number }[];
@@ -24,16 +25,21 @@ export const TOOLS: Record<string, ToolFn> = {
   'payments.transfer': a => ({ result: { transferId: `TX-${h(a).toString(16)}`, status: 'accepted-sim', amount: a.amount } }),
   'fraud.flag': a => ({ result: { flagId: `FL-${h(a).toString(16)}`, status: 'flagged-sim' } }),
   'agent.call': (_a, ctx) => ({ result: { delivered: true, from: ctx.agentId, to: ctx.targetAgentId } }),
+  'tickets.read': a => { const id = s(a.ticketId), n = Number(id.replace(/\D/g, '')), big = n >= 9000; return { result: { ticketId: id, status: 'approved', requestedCad: big ? 1800 : 20 + (h(id) % 38000) / 100, customer: `CUST-${h([id, 1]) % 90000 + 10000}`, synthetic: true } }; },
+  'refunds.issue': a => ({ result: { refundId: `RF-${h(a).toString(16)}`, ticketId: a.ticketId, amountCad: a.amountCad, status: 'issued-sim' } }),   // sandbox: no money moves
   'limits.get': a => ({ result: { segment: s(a.segment), approvedLimit: 1_000_000 + (h(a) % 9) * 250_000, currency: 'CAD' } }),
   'mail.send': a => ({ result: { messageId: `MSG-${h(a).toString(16)}`, status: 'queued-sim' } }),
 };
 
 /** Mock tool server. approvals.enqueue is the human-in-the-loop queue: nothing leaves it without a person. */
-export async function startTools(opts: { port?: number; host?: string } = {}): Promise<{ url: string; close(): Promise<void>; approvals: unknown[] }> {
+export async function startTools(opts: { port?: number; host?: string; secret?: string } = {}): Promise<{ url: string; close(): Promise<void>; approvals: unknown[]; refunds: { ticketId: string; amountCad: number; agentId?: string; ts: number }[]; rejectedUnsigned: number }> {
+  const refunds: { ticketId: string; amountCad: number; agentId?: string; ts: number }[] = []; const stats = { rejectedUnsigned: 0 };
   const approvals: { queueId: string; agentId?: string; status: string; item: unknown }[] = [];
   const r = createRouter();
   r.add('POST', '/tool/:name', async c => {
     const b = await c.json(); const name = c.params.name;
+    // Tool-side enforcement: only calls signed by a gateway are served. There is no way around the gateway to a tool without the shared secret.
+    if (!verifyToolSig(name, b, c.req.headers[SIG_HEADER] as string | undefined, opts.secret)) { stats.rejectedUnsigned++; return fail(401, 'missing or invalid gateway signature', { code: 'UNSIGNED' }); }
     if (name === 'approvals.enqueue') {
       const q = { queueId: `APR-${approvals.length + 1}`, agentId: b.agentId, status: 'pending-human-approval', item: b.args };
       approvals.push(q); if (approvals.length > 5000) approvals.shift();
@@ -41,12 +47,14 @@ export async function startTools(opts: { port?: number; host?: string } = {}): P
     }
     if (name === 'ledger.read' && b.args?.accountId === '') return fail(422, 'accountId must not be empty');
     const fn = TOOLS[name]; if (!fn) return fail(404, `unknown tool '${name}'`);
-    return ok(fn(b.args ?? {}, { agentId: b.agentId, targetAgentId: b.targetAgentId }));
+    const out = fn(b.args ?? {}, { agentId: b.agentId, targetAgentId: b.targetAgentId });
+    if (name === 'refunds.issue') { refunds.push({ ticketId: b.args.ticketId, amountCad: b.args.amountCad, agentId: b.agentId, ts: Date.now() }); if (refunds.length > 50_000) refunds.shift(); }
+    return ok(out);
   });
   r.add('GET', '/approvals', () => ok(approvals.slice(-100)));
   r.add('GET', '/healthz', () => ok({ ok: true }));
   const server = http.createServer(async (req, res) => { if (!(await r.handle(req, res))) { res.writeHead(404); res.end(); } });
   const url = await listen(server, opts.port ?? 0, opts.host);
   let closed = false;
-  return { url, approvals, async close() { if (closed) return; closed = true; await closeServer(server); } };
+  return { url, approvals, refunds, get rejectedUnsigned() { return stats.rejectedUnsigned; }, async close() { if (closed) return; closed = true; await closeServer(server); } };
 }

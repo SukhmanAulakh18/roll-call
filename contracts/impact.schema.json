@@ -24,6 +24,8 @@
     "release": {"type": "object", "required": ["command", "badRuns", "goodRuns", "autoRollbacks", "falseRollbacks", "timeToRollbackMs"], "properties": {"badRuns": {"type": "integer", "minimum": 5}, "goodRuns": {"type": "integer", "minimum": 5}}},
     "bench": {"type": "object", "required": ["governed", "direct", "overheadP99Ms", "throughputRps", "command"]},
     "chaos": {"type": "object", "required": ["command", "scenarios", "runAt"]},
+    "external": {"type": "object", "description": "make external-demo: a genuine external agent process governed by Roll Call", "required": ["command", "timeToContainMs", "deniedAfterStop", "allowedAfterProof"]},
+    "containment": {"type": "object", "description": "make containment: per-test n/passed/failed plus the guarantees list", "required": ["command", "tests", "guarantees"]},
     "assumptions": {"type": "object", "description": "Every value here is an ASSUMPTION and must be labeled so in the UI", "required": ["pricesUsdPerCall"]}
   }
 }

@@ -47,13 +47,13 @@
       "targetNote": "threshold p(99)<50 ms on http_req_duration{endpoint:act}; a target, not a result"
     }
   },
-  "generatedAt": "2026-11-19T15:34:34.489Z",
-  "gitSha": "eebcee1",
+  "generatedAt": "2026-11-20T03:22:41.751Z",
+  "gitSha": "2841e9a",
   "environment": {
-    "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
     "cores": 4,
     "node": "v22.23.5",
-    "os": "linux 6.18.44-fc-v653"
+    "os": "linux 6.18.44-fc-v726"
   },
   "fleet": {
     "registered": 12,
@@ -594,5 +594,228 @@
       "sloTarget": 0.99,
       "budgetMinCalls": 20
     }
+  },
+  "external": {
+    "command": "node scripts/external-demo.ts",
+    "agentId": "refund-processing-agent",
+    "agentName": "Refund Processing Agent",
+    "separateProcess": true,
+    "agentPid": 1034,
+    "supervisorPid": 1027,
+    "decision": "deterministic rules (no model)",
+    "tools": "sandbox refunds.issue, tickets.read (synthetic, no money moves)",
+    "perRefundLimitCad": 500,
+    "legit": {
+      "refundsAttempted": 14,
+      "allowed": 14
+    },
+    "overLimit": {
+      "attemptedCad": 1800,
+      "verdict": "deny",
+      "code": "OVER_LIMIT"
+    },
+    "loop": {
+      "calls": 173,
+      "allowed": 38,
+      "throttled": 58,
+      "deniedRevoked": 77,
+      "signal": "repeat signature (same tool + args) plus rate spike"
+    },
+    "timeline": {
+      "faultStartToDetectedMs": 400,
+      "toThrottledMs": 400,
+      "toPagedMs": 1151,
+      "toOwnerAckMs": 2151,
+      "toKilledMs": 2152,
+      "toProofMs": 2382
+    },
+    "timeToContainMs": 2382,
+    "simulatedOwnerAckMs": 1000,
+    "pagesSimulated": 1,
+    "requestsBeforeStop": 125,
+    "allowedBeforeStop": 66,
+    "deniedAfterStop": 77,
+    "allowedAfterStop": 0,
+    "allowedAfterProof": 0,
+    "firstDenialAfterRevokeMs": 37,
+    "agentStillRunningAfterKill": true,
+    "note": "Roll Call revokes identity; it does not signal the OS process. The process keeps running and every retry is denied.",
+    "independentProbe": {
+      "verdict": "deny",
+      "code": "REVOKED"
+    },
+    "restart": {
+      "exitCode": 3,
+      "identityRefused": true,
+      "code": "REVOKED",
+      "controlHttpStatus": 403
+    },
+    "toolSide": {
+      "refundsIssuedTotal": 52,
+      "maxRefundCad": 377.48,
+      "overLimitReachedTool": 0,
+      "duplicateRefundsOnLoopTicketBeforeKill": 38,
+      "duplicateRefundCadBeforeKill": 4560,
+      "unsignedRejected": 0
+    }
+  },
+  "containment": {
+    "command": "node scripts/containment.ts",
+    "runs": 15,
+    "falsePositiveRuns": 10,
+    "durationSec": 53,
+    "allPassed": true,
+    "tests": [
+      {
+        "id": "concurrency",
+        "name": "200 concurrent requests while the kill fires: none sent after the first denial is allowed",
+        "n": 15,
+        "passed": 15,
+        "failed": 0,
+        "pass": true,
+        "concurrentWorkers": 200,
+        "totalRequests": 78155,
+        "allowedBeforeRevocation": 21840,
+        "allowedSentAfterRevocationBeforeGatewayObservedIt": 1250,
+        "deniedAfterRevocation": 55065,
+        "allowedAfterFirstDenial": 0,
+        "fetchErrors": 0,
+        "revokeToFirstDenialMs": {
+          "p50": 69,
+          "p95": 129,
+          "p99": 129,
+          "max": 129,
+          "n": 15
+        },
+        "gatewayPollMs": 200,
+        "note": "n = kill runs; each run has 200 workers looping for ~1.2 s. The lag window is the gateway bundle poll interval; requests sent inside it are allowed and are counted, not hidden."
+      },
+      {
+        "id": "token-replay",
+        "name": "old identity token replayed after the kill is denied (REVOKED)",
+        "n": 200,
+        "passed": 200,
+        "failed": 0,
+        "pass": true,
+        "tokenWorkedBeforeKill": true
+      },
+      {
+        "id": "bypass",
+        "name": "direct call to a tool without a valid gateway signature gets 401; /v1/direct is off by default",
+        "n": 300,
+        "passed": 300,
+        "failed": 0,
+        "pass": true,
+        "toolRejectedByVariant": {
+          "no signature": 50,
+          "forged signature (wrong secret)": 50,
+          "garbage signature": 50,
+          "valid signature for a different body (tampered args)": 50,
+          "captured signature replayed after its freshness window": 50
+        },
+        "directEndpoint404": 50,
+        "refundsThatReachedTool": 0,
+        "positiveControl": {
+          "correctlySignedCallStatus": 200,
+          "note": "A holder of the shared tool secret CAN call tools: the signature moves trust to the secret, it does not make the tool unreachable."
+        }
+      },
+      {
+        "id": "in-flight",
+        "name": "request already past the gateway when the kill lands completes (documented boundary); the next request is denied",
+        "n": 15,
+        "passed": 15,
+        "failed": 0,
+        "pass": true,
+        "inFlightCompleted": 15,
+        "inFlightDenied": 0,
+        "toolDelayMs": 1200,
+        "note": "15 of 15 in-flight requests completed after the kill. This is the guarantee boundary, not a bug: the gateway cannot recall an action it already allowed. passed = the NEXT request after the kill was denied."
+      },
+      {
+        "id": "restart",
+        "name": "killed agent asking for a new identity (also after re-registering the same id) is refused",
+        "n": 100,
+        "passed": 100,
+        "failed": 0,
+        "pass": true,
+        "plainRequestRefused": 50,
+        "afterReRegistrationRefused": 50,
+        "openRegistrationNewIdAccepted": true,
+        "note": "FINDING: registration (POST /v1/agents) is unauthenticated in this prototype, so a process that can reach control can register a NEW id and get a token for it. Registration needs an owner-approved admission workflow in production."
+      },
+      {
+        "id": "arg-tampering",
+        "name": "over-limit amounts hidden as strings, negatives, floats, containers, splits are denied by arg validation",
+        "n": 320,
+        "passed": 320,
+        "failed": 0,
+        "pass": true,
+        "variants": 16,
+        "repsPerVariant": 20,
+        "unexpected": [],
+        "boundaryAllowed": [
+          "allow",
+          "allow",
+          "allow",
+          "allow"
+        ],
+        "refundsThatReachedTool": 4,
+        "maxRefundCadAtTool": 500,
+        "note": "Only the 4 boundary amounts (500, 0.01, 499.99) legitimately reached the tool. NOT covered: many separate in-limit refunds on one ticket (no cumulative per-ticket cap); only the repeat detector and budgets stand in the way."
+      },
+      {
+        "id": "false-positives",
+        "name": "legitimate high-volume agent with varied tickets is not hard-contained (no page, no kill)",
+        "n": 10,
+        "passed": 10,
+        "failed": 0,
+        "pass": true,
+        "hardContainedRuns": 0,
+        "softThrottledRuns": 10,
+        "legitCalls": 1808,
+        "legitCallsThrottled": 891,
+        "legitCallsDeniedOther": 0,
+        "note": "Each run: ~4 calls/s for 3.5 s, then ~40 calls/s for 4 s with a new ticket on every call. A burst this far above its own baseline can still draw a SOFT throttle (a slowdown, no page, no kill); those legitimate calls answered 429 are counted above."
+      }
+    ],
+    "guarantees": [
+      {
+        "guaranteed": true,
+        "text": "Once a gateway has observed a revocation, no new protected action goes through that gateway: every later request is denied (REVOKED). Tests: concurrency, token-replay, restart."
+      },
+      {
+        "guaranteed": true,
+        "text": "Sandbox tools reject any call that does not carry a fresh gateway HMAC signature (401), so there is no unsigned path around the gateway. Test: bypass."
+      },
+      {
+        "guaranteed": true,
+        "text": "Over-limit and malformed refund arguments are denied before the tool is reached (OVER_LIMIT, INVALID_ARGS). Test: arg-tampering."
+      },
+      {
+        "guaranteed": false,
+        "text": "Actions already past the gateway when the kill lands. They complete. Test: in-flight."
+      },
+      {
+        "guaranteed": false,
+        "text": "Requests sent inside the propagation window (up to the gateway bundle poll interval, 200 ms here) before a gateway has observed the revocation. They are counted in concurrency."
+      },
+      {
+        "guaranteed": false,
+        "text": "Actions through paths that do not use the gateway: anyone holding the tool secret, or a tool that does not check signatures, is outside this guarantee."
+      },
+      {
+        "guaranteed": false,
+        "text": "Stopping the OS process. Roll Call revokes identity; the process keeps running and keeps being denied."
+      },
+      {
+        "guaranteed": false,
+        "text": "Registering a brand-new agent id. Registration is unauthenticated in this prototype (see restart finding)."
+      },
+      {
+        "guaranteed": false,
+        "text": "Many separate in-limit refunds on one ticket: no cumulative per-ticket cap."
+      }
+    ]
   }
 }

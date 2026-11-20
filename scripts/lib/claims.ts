@@ -77,6 +77,22 @@ export const CLAIMS: Claim[] = [
   { claim: 'Control down: low-risk continues, high-risk fails closed, no admissions', path: '', fmt: 'str', value: 'pass', artifact: 'tests/acceptance/dod.test.ts (DoD6)', repro: 'npm run test:acceptance', in: [CTO], check: "node --test --test-name-pattern=DoD6 tests/acceptance/dod.test.ts" },
   { claim: 'Malformed bundle is rejected and the last good bundle kept (unit test)', path: '', fmt: 'str', value: 'pass', artifact: 'services/gateway/src/gateway.test.ts', repro: 'npm test', in: [CTO], check: "node --test --test-name-pattern='malformed bundle' services/gateway/src/gateway.test.ts" },
 ];
+// External agent + containment tests (make external-demo, make containment). Rendered into docs/containment.md by exec-pack.ts.
+const CD = 'docs/containment.md';
+const EX = (claim: string, path: string, fmt: string): Claim => ({ claim: `External agent: ${claim}`, path: `external.${path}`, fmt, artifact: `impact.json external.${path}`, repro: 'make external-demo', in: [CD] });
+export const CONTAINMENT_IDS = ['concurrency', 'token-replay', 'bypass', 'in-flight', 'restart', 'arg-tampering', 'false-positives'];
+CLAIMS.push(
+  EX('legit refunds allowed before the fault', 'legit.allowed', 'int'), EX('over-limit refund verdict code', 'overLimit.code', 'str'),
+  EX('time from fault start to contained (proof), includes simulated owner ack', 'timeToContainMs', 'ms'), EX('calls denied after the kill (agent kept retrying)', 'deniedAfterStop', 'int'),
+  EX('calls allowed after the kill proof', 'allowedAfterProof', 'int'), EX('independent probe code', 'independentProbe.code', 'str'),
+  EX('duplicate refunds that reached the tool before the kill', 'toolSide.duplicateRefundsOnLoopTicketBeforeKill', 'int'), EX('refunds over the limit that reached the tool', 'toolSide.overLimitReachedTool', 'int'),
+  EX('restart attempt refusal code', 'restart.code', 'str'),
+  ...CONTAINMENT_IDS.flatMap((id, i): Claim[] => ['n', 'passed', 'failed'].map(f => ({ claim: `Containment test ${id}: ${f}`, path: `containment.tests[${i}].${f}`, fmt: 'int', artifact: `impact.json containment.tests[${i}]`, repro: 'make containment', in: [CD] }))),
+  ...['p50', 'p95', 'p99'].map((q): Claim => ({ claim: `Containment: time from revocation to first denial under 200 concurrent requests, ${q}`, path: `containment.tests[0].revokeToFirstDenialMs.${q}`, fmt: 'ms', artifact: 'impact.json containment.tests[0].revokeToFirstDenialMs', repro: 'make containment', in: [CD] })),
+  { claim: 'Containment: requests allowed in the propagation window after revocation (counted, not hidden)', path: 'containment.tests[0].allowedSentAfterRevocationBeforeGatewayObservedIt', fmt: 'int', artifact: 'impact.json containment.tests[0]', repro: 'make containment', in: [CD] },
+  { claim: 'Containment: in-flight requests that completed after the kill (documented boundary)', path: 'containment.tests[3].inFlightCompleted', fmt: 'int', artifact: 'impact.json containment.tests[3]', repro: 'make containment', in: [CD] },
+  { claim: 'External agent acceptance: process denied after kill', path: '', fmt: 'str', value: 'pass', artifact: 'tests/acceptance/external-agent.test.ts', repro: 'npm run test:acceptance', in: [CD], check: "node --test tests/acceptance/external-agent.test.ts" },
+);
 export const shown = (c: Claim, impact: any): string => c.value ?? FORMATS[c.fmt](get(impact, c.path));
 
 /** Price table rows for cost-model.md. These are ASSUMPTIONS copied from impact.json; the claim is that the doc matches the file. */

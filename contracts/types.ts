@@ -28,6 +28,7 @@ export interface AgentRecord {
   lifecycleState: LifecycleState;
   evaluation: { evidenceUrl: string; passed: boolean; date: string } | null;
   budgets: { perHourUsd: number; perDayUsd: number; perTaskUsd: number };
+  argLimits?: { tool: string; arg: string; max: number }[]; // arg-level policy: the gateway denies OVER_LIMIT above max (e.g. refunds.issue amountCad 500)
   reviewDate: string;
   nextMonitoringDate: string;
   runtimeRef: { kind: 'Deployment' | 'Agent' | 'Sandbox' | 'SimProcess'; name: string; namespace: string };
@@ -89,7 +90,7 @@ export interface Receipt {
 export interface PolicyBundle {
   version: number;
   issuedAt: number;
-  agents: Record<string, Pick<AgentRecord, 'id' | 'riskRating' | 'lifecycleState' | 'scopes' | 'models' | 'budgets'>>;
+  agents: Record<string, Pick<AgentRecord, 'id' | 'riskRating' | 'lifecycleState' | 'scopes' | 'models' | 'budgets' | 'argLimits'>>;
   revoked: Record<string, number>;           // agentId -> revokedAt (epoch ms)
   throttles: Record<string, { ratePerSec: number; hard: boolean; reason: string }>;
   highRiskTools: string[];                   // fail closed when bundle is stale
