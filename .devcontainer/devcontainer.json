@@ -1,0 +1,13 @@
+{
+  "name": "Roll Call (live backend + UI)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "npm ci && cd ui && npm ci && npm run build",
+  "postAttachCommand": { "roll-call": "node scripts/serve.ts --ui ui/dist" },
+  "forwardPorts": [7100],
+  "portsAttributes": {
+    "7100": { "label": "Roll Call", "onAutoForward": "openBrowser" },
+    "7200": { "label": "gateway", "onAutoForward": "ignore" },
+    "7300": { "label": "mock tools", "onAutoForward": "ignore" }
+  },
+  "hostRequirements": { "cpus": 2 }
+}

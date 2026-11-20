@@ -143,6 +143,10 @@ Licences are to be verified before adoption. Do not treat this table as final.
 
 ## Deploy
 
+**Fastest live run in the cloud: GitHub Codespaces (free tier, no install).**
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/SukhmanAulakh18/roll-call?quickstart=1)
+It installs, builds the UI, starts the whole stack and opens Roll Call in a browser tab (port 7100). Stop the codespace when done to save free hours.
+
 **Live app (one container, whole stack).** `deploy/Dockerfile.web` builds the UI and runs control, gateway, tools and the simulated fleet in one process, serving the UI and API on `$PORT`.
 
 - Render: Dashboard → New → Blueprint → pick this repo (`render.yaml`). Free plan; health check `/healthz`.
