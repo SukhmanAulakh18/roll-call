@@ -2,12 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
-import { BadgeCheck, Check, Link2, OctagonX, ShieldOff, X } from 'lucide-react';
-import type { ActionEvent, IncidentEvent } from '../../contracts/types';
-import { FIXTURE, getState, killAgent, useStore, verifyReceipts } from './store';
-import { fixtureReceipt } from './fixtures/FIXTURE_stream';
-import { setUi, useUi } from './ui-state';
-import { FixtureChip, Initials, NotMeasured, StateMark, VerdictChip, clock, ownerShort, usd, type AgentState } from './ui';
+import { Check, Link2, OctagonX, ShieldOff, X } from 'lucide-react';
+import type { IncidentEvent } from '../../contracts/types';
+import { getState, killAgent, useStore } from './store';
+import { openReceipt, setUi, useUi } from './ui-state';
+import { Initials, NotMeasured, StateMark, ownerShort, usd, type AgentState } from './ui';
 
 /** Mirrors contracts/prices.ts HIGH_RISK_TOOLS (the tools a stale bundle fails closed on). */
 export const HIGH_RISK_TOOLS = ['payments.transfer', 'ledger.post', 'mail.send'];
@@ -29,7 +28,7 @@ export function ProofCard({ agentId, proof, title = 'Stopped, and proven.' }: { 
       <motion.span className="stamp" aria-hidden="true" initial={reduce ? false : { opacity: 0, scale: 1.9, rotate: -2 }} animate={{ opacity: 1, scale: 1, rotate: -9 }} transition={{ delay: 0.45, type: 'spring', stiffness: 520, damping: 22 }}>
         {denied ? <Check size={18} strokeWidth={3} /> : <ShieldOff size={18} strokeWidth={3} />}{denied ? 'Refused' : 'Open'}
       </motion.span>
-      <button className="btn btn--sm" onClick={() => { const a = getState().actions.find((x) => x.receiptId === proof.receiptId); if (a) setUi({ receipt: a }); else toast('Receipt is not in this browser session yet.', { description: proof.receiptId }); }}><Link2 size={14} aria-hidden />Open receipt</button>
+      <button className="btn btn--sm" onClick={() => { const a = getState().actions.find((x) => x.receiptId === proof.receiptId); if (a) openReceipt(a); else toast('Receipt is not in this browser session yet.', { description: proof.receiptId }); }}><Link2 size={14} aria-hidden />Open receipt</button>
     </motion.section>
   );
 }
@@ -144,69 +143,6 @@ export function KillDialog() {
           )}
           {agent && proof && (proof.stage === 'kill_unconfirmed' ? <KillUnconfirmed ev={proof} /> : proof.proof ? <ProofCard agentId={agent.id} proof={proof.proof} /> : <p className="note">Kill sent. The server returned no proof yet: {proof.message}</p>)}
           {proof && <div className="modal-foot"><Dialog.Close className="btn btn--primary">Done</Dialog.Close></div>}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-// ---------- receipt detail ----------
-export function ReceiptDialog() {
-  const a = useUi((u) => u.receipt);
-  const actions = useStore((s) => s.actions);
-  const [res, setRes] = useState<Awaited<ReturnType<typeof verifyReceipts>> | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  useEffect(() => { setRes(null); setErr(''); }, [a?.receiptId]);
-  if (!a) return null;
-  const [gw, seqS] = a.receiptId.split(':');
-  const seq = Number(seqS);
-  const fx = FIXTURE ? fixtureReceipt(a.receiptId) : undefined;
-  const prevId = `${gw}:${seq - 1}`, nextId = `${gw}:${seq + 1}`;
-  const prev = actions.find((x) => x.receiptId === prevId);
-  const verify = async () => { setBusy(true); setErr(''); try { setRes(await verifyReceipts()); } catch (e) { setErr((e as Error).message); } setBusy(false); };
-  const open = (x?: ActionEvent) => x && setUi({ receipt: x });
-  const next = actions.find((x) => x.receiptId === nextId);
-  return (
-    <Dialog.Root open onOpenChange={(o) => !o && setUi({ receipt: null })}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="scrim" />
-        <Dialog.Content className="modal" aria-describedby="rc-d">
-          <div className="sheet-h">
-            <Dialog.Title asChild><h2>Receipt <span className="measured">{a.receiptId}</span></h2></Dialog.Title>
-            <Dialog.Close className="btn btn--icon" aria-label="Close"><X size={16} aria-hidden /></Dialog.Close>
-          </div>
-          <Dialog.Description id="rc-d" className="sheet-lead">One gateway decision, written to a hash chain so it cannot be edited later without breaking every receipt after it. {a.governed ? '' : 'This one came from the ungoverned baseline path and has no receipt.'}</Dialog.Description>
-          <dl className="facts facts--cols">
-            <div><dt>Decision</dt><dd><VerdictChip v={a.verdict} code={a.code} /> <span className="measured">{a.code}</span></dd></div>
-            <div><dt>Agent and tool</dt><dd><span className="measured">{a.agentId}</span> called <span className="measured">{a.tool}</span>{a.targetAgentId ? <> targeting <span className="measured">{a.targetAgentId}</span></> : null}</dd></div>
-            <div><dt>When</dt><dd className="measured">{new Date(a.ts).toLocaleString()}</dd></div>
-            <div><dt>Cost and decision time</dt><dd className="measured">{usd(a.costUsd, 4)}, {a.latencyMs} ms</dd></div>
-            <div><dt>Arguments hash</dt><dd className="measured wrap">{a.argsHash}</dd></div>
-            <div><dt>Gateway</dt><dd className="measured">{a.gatewayId}</dd></div>
-          </dl>
-          {a.governed && (
-            <section className="chainbox" aria-label="Hash chain">
-              <h3>Hash chain {FIXTURE && <FixtureChip />}</h3>
-              <div className="chain">
-                <div className="link"><span className="link-k">previous receipt</span><span className="measured">{prevId}</span><span className="link-h measured wrap">{fx ? fx.prevHash.slice(0, 32) + '…' : seq === 0 ? 'GENESIS' : 'hash is in the gateway JSONL'}</span></div>
-                <span className="chain-arrow" aria-hidden="true">→</span>
-                <div className="link link--this"><span className="link-k">this receipt</span><span className="measured">{a.receiptId}</span><span className="link-h measured wrap">{fx ? fx.hash.slice(0, 32) + '…' : 'hash is in the gateway JSONL'}</span></div>
-              </div>
-              {!fx && <p className="muted">The stream carries the decision, not the hashes. Verifying recomputes every hash on the gateway and reports the first broken sequence, if any.</p>}
-              {FIXTURE && <p className="muted">Fixture hashes come from a simple in-browser mixer, not SHA-256. They only show the shape of the chain.</p>}
-              <div className="row-actions">
-                <button className="btn btn--sm" onClick={() => open(prev)} disabled={!prev}>Previous</button>
-                <button className="btn btn--sm" onClick={() => open(next)} disabled={!next}>Next</button>
-                <button className="btn btn--primary btn--sm" onClick={verify} disabled={busy}><BadgeCheck size={14} aria-hidden />{busy ? 'Recomputing' : 'Verify chain'}</button>
-              </div>
-              <div aria-live="polite">
-                {err && <p className="note-bad">{err}</p>}
-                {res?.map((r) => <p key={r.gateway} className={r.ok ? 'note-ok' : 'note-bad'}>{r.ok ? <Check size={14} aria-hidden /> : <ShieldOff size={14} aria-hidden />} {r.gateway}: {r.ok ? `chain intact${r.count != null ? `, ${r.count} receipts recomputed` : ''}` : `BROKEN ${r.reason ?? ''}`}</p>)}
-              </div>
-            </section>
-          )}
-          <p className="muted">{clock(a.ts)}</p>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

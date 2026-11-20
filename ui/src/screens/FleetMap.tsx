@@ -6,7 +6,7 @@ import { AgentDrawer, EdgeDrawer, ToolDrawer } from '../drawer';
 import { toolWhat } from '../vocab';
 import type { ActionEvent, AgentRecord } from '../../../contracts/types';
 import { getState, useStore } from '../store';
-import { useUi } from '../ui-state';
+import { closeDrawer, openAgent, useUi } from '../ui-state';
 import { Initials, Sparkline, StateIcon, Tip, stateLabel, usd, useLocal, useNow, type AgentState } from '../ui';
 import { AGENT_H, AGENT_W, NODE_H, TOOL_W, computeStats, groupKey, layout, liveIncident, type GroupBy, type LiveStats } from '../graph';
 
@@ -125,8 +125,10 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
   const [filter, setFilter] = useState<'all' | AgentState>('all');
   const [hover, setHover] = useState<string | null>(null);
   const [sel, setSel] = useState<Sel | null>(null);
+  const gdrawer = useUi((u) => u.drawer);
+  useEffect(() => { if (gdrawer) setSel(null); }, [gdrawer]);
   const canKill = useStore((s) => s.source === 'live' || s.source === 'fixture');
-  const dialogOpen = useUi((u) => !!u.receipt || !!u.killId);
+  const dialogOpen = useUi((u) => !!u.killId);
   const root = useRef<HTMLDivElement>(null);
   const [full, setFull] = useState(false);   // true in native fullscreen or in the modal fallback
   const [modal, setModal] = useState(false);
@@ -250,7 +252,7 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
     return out;
   }, [agents, lay, stats, rel, sel, recent, dim, cycle, focus, newestTs, now, driftTool]);
 
-  const pick = useCallback((k: 'agent' | 'tool' | 'data', id: string) => { if (compact) { if (k === 'agent') onSelect(id); return; } setSel({ k, id }); }, [compact, onSelect]);
+  const pick = useCallback((k: 'agent' | 'tool' | 'data', id: string) => { if (compact) { if (k === 'agent') onSelect(id); return; } if (k === 'agent') { setSel(null); openAgent(id, 'reset'); return; } closeDrawer(); setSel({ k, id }); }, [compact, onSelect]);
   const ctx: MapCtx = useMemo(() => ({ pick, sel, rel, selected: sel?.k === 'agent' ? sel.id : sel ? null : selected, hover, setHover, dim, by, reduce }), [pick, sel, rel, selected, hover, dim, by, reduce]);
   const onEdgeClick = useCallback((_: unknown, e: Edge) => {
     if (compact) return;
@@ -288,8 +290,8 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
         {agents.length === 0 && <p className="map-empty"><Rows3 size={16} aria-hidden /> Waiting for the registry to load.</p>}
       </div>
       {!compact && sel && (sel.k === 'agent' ? <AgentDrawer id={sel.id} canKill={canKill} onClose={() => setSel(null)} />
-        : sel.k === 'edge' ? <EdgeDrawer agentId={sel.agent} target={sel.target} kind={sel.tk} onClose={() => setSel(null)} onPick={(k, id) => setSel({ k, id })} />
-        : <ToolDrawer id={sel.id} kind={sel.k} onClose={() => setSel(null)} onPick={(id) => setSel({ k: 'agent', id })} />)}
+        : sel.k === 'edge' ? <EdgeDrawer agentId={sel.agent} target={sel.target} kind={sel.tk} onClose={() => setSel(null)} onPick={(k, id) => pick(k, id)} />
+        : <ToolDrawer id={sel.id} kind={sel.k} onClose={() => setSel(null)} onPick={(id) => pick('agent', id)} />)}
       {!compact && <p className="visually-hidden" aria-live="polite">{inc ? `Incident on ${inc.agentId}: ${inc.last.stage}` : 'No incident'}</p>}
       </div>
     </Ctx.Provider>

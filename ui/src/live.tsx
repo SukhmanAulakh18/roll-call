@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, Bot, Check, Link2, PauseCircle, ShieldCheck, Siren, Wrench, X } from 'lucide-react';
 import type { ActionEvent } from '../../contracts/types';
 import { getState, useStore } from './store';
-import { setUi } from './ui-state';
+import { openReceipt } from './ui-state';
 import { Tip, groupIncidents, secs, useNow } from './ui';
 
 // Patterns adapted from Magic UI (MIT, github.com/magicuidesign/magicui): AnimatedBeam, BorderBeam, MagicCard spotlight, AnimatedList.
@@ -116,7 +116,7 @@ export function ReceiptChain({ max = 4, mini = false }: { max?: number; mini?: b
         {rows.map((a, i) => (
           <motion.li key={a.receiptId} className="chain-i" initial={reduce ? false : { opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}>
             {i > 0 && <Link2 size={14} className="chain-link" aria-hidden="true" />}
-            <button type="button" className={`chain-b v-${a.verdict}`} onClick={() => setUi({ receipt: a })}>
+            <button type="button" className={`chain-b v-${a.verdict}`} onClick={() => openReceipt(a)}>
               <span className="measured">{a.receiptId}</span>{' '}{!mini && <span className="chain-v">{VERDICT[a.verdict]}</span>}
             </button>
           </motion.li>

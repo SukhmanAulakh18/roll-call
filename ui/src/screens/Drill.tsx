@@ -144,7 +144,7 @@ export function Drill() {
 
       <div className="theatre">
         <Panel title={<>The roll, zoomed to {agent?.name ?? d.agent}</>} aside={<StateMark state={agState} />} id="tm-h" className="theatre-ring">
-          <div className="theatre-ringbox" data-tour="map"><RollRing compact selected={null} onSelect={(id) => { location.hash = `#/agent/${encodeURIComponent(id)}`; }} focus={zoomed ? d.agent : null} /></div>
+          <div className="theatre-ringbox" data-tour="map"><RollRing compact focus={zoomed ? d.agent : null} /></div>
         </Panel>
         <div className="theatre-proof" data-tour="proof">
           {showProof && g?.byStage.kill_unconfirmed ? <KillUnconfirmed ev={g.byStage.kill_unconfirmed} /> : showProof && proof ? <ProofCard agentId={g!.agentId} proof={proof} /> : (

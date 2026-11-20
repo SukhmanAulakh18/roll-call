@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { ArrowRight, Octagon, Pause, Play, X } from 'lucide-react';
 import type { ActionEvent } from '../../../contracts/types';
 import { getState, runDrill, useStore, verifyReceipts } from '../store';
-import { setUi, useUi } from '../ui-state';
+import { openReceipt, setUi, useUi } from '../ui-state';
 import { Lifecycle } from '../gates';
 import { Assumption, CountUp, Initials, NotMeasured, Sparkline, StateMark, Tip, VerdictChip, VerifyButton, clock, groupIncidents, isNum, ownerShort, secs, useLocal, usd, type AgentState } from '../ui';
 import { Panel } from '../components';
@@ -177,7 +177,7 @@ export function Ticker({ className = '' }: { className?: string }) {
               const a = rows[vi.index];
               const name = agents.find((x) => x.id === a.agentId)?.name ?? a.agentId;
               return (
-                <button key={a.receiptId + vi.index} role="listitem" type="button" className={`trow v-${a.verdict}`} style={{ transform: `translateY(${vi.start}px)`, height: vi.size }} onClick={() => setUi({ receipt: a })} aria-label={`${clock(a.ts)} ${name} ${a.tool} ${a.verdict}. Open receipt ${a.receiptId}`}>
+                <button key={a.receiptId + vi.index} role="listitem" type="button" className={`trow v-${a.verdict}`} style={{ transform: `translateY(${vi.start}px)`, height: vi.size }} onClick={() => openReceipt(a)} aria-label={`${clock(a.ts)} ${name} ${a.tool} ${a.verdict}. Open receipt ${a.receiptId}`}>
                   <span className="measured t-time">{clock(a.ts)}</span>
                   <span className="t-agent">{name}</span>
                   <span className="measured t-tool">{a.tool}</span>
@@ -237,7 +237,7 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
             <Row k="Value per day">{isNum(assumed) ? <><span className="measured">{usd(assumed)}</span> <Assumption /></> : <span className="muted">No assumption set. Use the value ledger.</span>}</Row>
           </dl>
           <h3 className="sub">Recent decisions</h3>
-          {recent.length ? <ul className="mini-list">{recent.slice(0, 8).map((x) => <li key={x.receiptId}><button className="linklike" onClick={() => setUi({ receipt: x })}><span className="measured">{clock(x.ts)}</span> <span className="measured">{x.tool}</span> <VerdictChip v={x.verdict} code={x.code} /></button></li>)}</ul> : <p className="muted">None seen in this session.</p>}
+          {recent.length ? <ul className="mini-list">{recent.slice(0, 8).map((x) => <li key={x.receiptId}><button className="linklike" onClick={() => openReceipt(x)}><span className="measured">{clock(x.ts)}</span> <span className="measured">{x.tool}</span> <VerdictChip v={x.verdict} code={x.code} /></button></li>)}</ul> : <p className="muted">None seen in this session.</p>}
         </Tabs.Content>
         <Tabs.Content value="touch" className="tabs-c">
           <h3 className="sub">Tools, live calls per second</h3>
@@ -326,7 +326,7 @@ export function Fleet({ selected }: { selected: string | null }) {
             <button aria-pressed={view === 'topology'} onClick={() => setView('topology')}>Topology</button>
           </div>}>
           <div className="ring-frame" data-tour="map">
-            {view === 'roll' ? <RollRing selected={selected} onSelect={select} /> : <div className="map-frame map-frame--home"><Suspense fallback={<p className="empty" role="status">Loading the topology</p>}><FleetMap selected={selected} onSelect={select} /></Suspense></div>}
+            {view === 'roll' ? <RollRing /> : <div className="map-frame map-frame--home"><Suspense fallback={<p className="empty" role="status">Loading the topology</p>}><FleetMap selected={selected} onSelect={select} /></Suspense></div>}
           </div>
           {view === 'roll' && <p className="ring-hint">Arrow keys move around the ring. Enter opens an agent record.</p>}
         </Panel>

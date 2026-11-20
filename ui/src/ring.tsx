@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Check, Pause, TriangleAlert, X } from 'lucide-react';
 import { useStore } from './store';
+import { openAgent, useUi } from './ui-state';
 import { Sparkline, groupIncidents, ownerShort, usd, useNow, type AgentState } from './ui';
 
 /** Heartbeat older than this means the agent did not answer the last sweep. */
@@ -21,10 +22,12 @@ function useWide(ref: React.RefObject<HTMLElement>) {
   return w;
 }
 
-interface Props { selected: string | null; onSelect: (id: string) => void; focus?: string | null; compact?: boolean }
+interface Props { focus?: string | null; compact?: boolean }
 
 /** The roll: every registered agent is a station on a ring, a slow sweep asks each to answer. */
-export function RollRing({ selected, onSelect, focus = null, compact = false }: Props) {
+export function RollRing({ focus = null, compact = false }: Props) {
+  const dv = useUi((u) => u.drawer);
+  const selected = dv?.k === 'agent' ? dv.id : null;
   const agents = useStore((s) => s.agents);
   const states = useStore((s) => s.fleet?.states);
   const rates = useStore((s) => s.fleet?.spendPerMinUsd);
@@ -91,8 +94,8 @@ export function RollRing({ selected, onSelect, focus = null, compact = false }: 
               <button key={r.a.id} ref={(el) => { btns.current[r.i] = el; }} type="button" tabIndex={r.i === tabIdx ? 0 : -1}
                 className={`st st-${r.look} st-side-${p.side} ${on ? 'is-on' : ''} ${focus === r.a.id ? 'is-focus' : ''}`}
                 style={{ left: `${(p.x / VW) * 100}%`, top: `${(p.y / VH) * 100}%`, ['--delay' as string]: `${((r.i / Math.max(n, 1)) * SWEEP_S).toFixed(2)}s`, ['--period' as string]: `${SWEEP_S}s` }}
-                aria-label={`${[r.a.name, r.look !== 'live' ? LOOK_LABEL[r.look] : '', r.proof ? 'Proof' : ''].filter(Boolean).join(' ')} ${r.look === 'live' ? 'Answered. ' : ''}${r.proof ? 'Proof of stop on file. ' : ''}Open record.`} aria-current={on ? 'true' : undefined}
-                onClick={() => { setTab(r.i); onSelect(r.a.id); }} onKeyDown={(e) => move(e, r.i)}
+                aria-label={`${[r.a.name, r.look !== 'live' ? LOOK_LABEL[r.look] : '', r.proof ? 'Proof' : ''].filter(Boolean).join(' ')} ${r.look === 'live' ? 'Answered. ' : ''}${r.proof ? 'Proof of stop on file. ' : ''}Open details.`} aria-current={on ? 'true' : undefined}
+                onClick={() => { setTab(r.i); openAgent(r.a.id, 'reset'); }} onKeyDown={(e) => move(e, r.i)}
                 onFocus={() => { setTab(r.i); setPeek(r.a.id); }} onBlur={() => setPeek(null)} onPointerEnter={() => setPeek(r.a.id)} onPointerLeave={() => setPeek(null)}>
                 <span className="st-node" aria-hidden="true"><i className="st-ping" />
                   {r.look === 'live' ? <Check size={20} strokeWidth={2.8} /> : r.look === 'alert' ? <TriangleAlert size={20} strokeWidth={2.4} /> : r.look === 'throttled' ? <Pause size={18} strokeWidth={2.6} /> : r.look === 'killed' ? <X size={20} strokeWidth={2.6} /> : <span className="st-dot" />}

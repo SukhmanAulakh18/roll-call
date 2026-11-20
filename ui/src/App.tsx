@@ -4,7 +4,8 @@ import { Command as CmdIcon, GraduationCap, Moon, Presentation, Sun, Video } fro
 import { FIXTURE, REPLAY_ONLY, start, useStore } from './store';
 import { setUi, useUi } from './ui-state';
 import { FixtureChip, TipProvider, VerifySheet, useLocal } from './ui';
-import { KillDialog, ReceiptDialog } from './components';
+import { KillDialog } from './components';
+import { GlobalDrawer } from './drawer';
 import { Fleet } from './screens/Fleet';
 import { Palette } from './palette';
 import { Tour } from './tour';
@@ -101,7 +102,7 @@ export function App() {
           <p className="footer-r"><span className={`chip ${connected || source !== 'live' ? 'chip--cool' : ''}`} role="status">{status}</span><span className="measured">Updated {updatedAt ? new Date(updatedAt).toLocaleTimeString([], { hour12: false }) : 'never'}</span></p>
         </div>
       </footer>
-      <VerifySheet /><KillDialog /><ReceiptDialog /><Palette theme={theme} setTheme={setTheme} /><Tour />
+      <VerifySheet /><KillDialog /><GlobalDrawer /><Palette theme={theme} setTheme={setTheme} /><Tour />
       <Toaster position="bottom-right" theme={theme} offset={{ bottom: 56 }} toastOptions={{ classNames: { toast: 'rc-toast' } }} />
     </TipProvider>
   );

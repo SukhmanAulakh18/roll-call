@@ -67,3 +67,6 @@
 .anode-btn, .tnode-btn { pointer-events: auto; }
 .plain--row { display: flex; gap: var(--space-md); flex-wrap: wrap; }
 .drawer .linklike { background: none; border: 0; color: var(--color-accent); text-decoration: underline; cursor: pointer; font: inherit; min-height: 24px; padding: 2px 0; } .drawer .linklike:focus-visible { outline: 2px solid var(--color-focus); }
+.drawer--fixed { position: fixed; top: var(--space-md); right: var(--space-md); bottom: var(--space-md); z-index: calc(var(--z-modal) - 1); }
+.drawer-h .btn--sm:not(.btn--icon) { align-self: flex-start; } .drawer-t { flex: 1; min-width: 0; } .drawer-b .plain--row { display: flex; gap: var(--space-xs); }
+@media (max-width: 700px) { .drawer--fixed { top: auto; } }
