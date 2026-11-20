@@ -286,7 +286,7 @@ function Inner({ selected, onSelect, focus, compact }: { selected: string | null
           {!compact && <Controls showInteractive={false} position="bottom-left" aria-label="Map zoom controls" />}
           {!compact && <MiniMap pannable zoomable position="bottom-right" ariaLabel="Fleet minimap" nodeStrokeWidth={2} nodeColor={(n) => (n.type === 'agent' ? 'var(--color-rule-2)' : 'var(--color-rule)')} maskColor="var(--color-scrim)" />}
         </ReactFlow>
-        {!compact && <div className="map-legend" aria-hidden="true"><span><i className="lg lg-flow" />live calls</span><span><i className="lg lg-drift" />out of scope</span><span><i className="lg lg-cycle" />loop</span></div>}
+        {!compact && <div className="map-legend" aria-hidden="true"><span><i className="lg lg-flow" />recent calls</span><span><i className="lg lg-drift" />out of scope</span><span><i className="lg lg-cycle" />loop</span></div>}
         {agents.length === 0 && <p className="map-empty"><Rows3 size={16} aria-hidden /> Waiting for the registry to load.</p>}
       </div>
       {!compact && sel && (sel.k === 'agent' ? <AgentDrawer id={sel.id} canKill={canKill} onClose={() => setSel(null)} />

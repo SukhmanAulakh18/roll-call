@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useReducedMotion } from 'motion/react';
-import { ArrowRight, BadgeCheck, Fingerprint, OctagonX, Play, ScanLine, Video } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Briefcase, Fingerprint, OctagonX, ScanLine, Video } from 'lucide-react';
 import { REPLAY_ONLY, useStore } from '../store';
 import { setUi } from '../ui-state';
-import { Assumption, FixtureChip, NotMeasured, VerifyButton, isNum, secs, usd, type VerifySpec } from '../ui';
+import { ModeChip, SimChip, KindChip, useIncident, pickNum } from '../modes';
+import { Assumption, NotMeasured, VerifyButton, isNum, secs, usd, type VerifySpec } from '../ui';
 
 const LOOP = 6; // seconds
 /** Seconds into the 6 s loop, 30 fps. Frozen on the final frame for reduced motion. */
@@ -75,12 +76,34 @@ function Reveal({ children, className = '', id }: { children: ReactNode; classNa
   return <section ref={ref} id={id} className={`story-sec reveal ${on ? 'in' : ''} ${className}`}>{children}</section>;
 }
 
-const QUESTIONS = ['What agents exist?', 'What can they touch?', 'What do they cost?', 'Can we stop one, and prove it?'];
 const STEPS = [
-  { icon: Fingerprint, h: 'Register', p: 'Every agent gets an owner, a purpose and a record before it runs.', to: ['#/registry', 'See the registry'] },
-  { icon: ScanLine, h: 'Guard', p: 'Every call passes a gateway: identity, scope, budget and policy.', to: ['#/control', 'Watch calls live'] },
-  { icon: OctagonX, h: 'Stop with proof', p: 'A runaway is caught and stopped. A probe call proves it is really refused.', to: ['#/drill', 'Run the drill'] },
+  { icon: Fingerprint, h: 'Register', p: 'Every AI agent is listed with a named owner and a purpose before it runs.', to: ['#/registry', 'See the list of agents'] },
+  { icon: ScanLine, h: 'Check', p: 'Every action an agent takes goes through a checkpoint first. It checks what the agent may touch and how much it may spend.', to: ['#/control', 'See the control room'] },
+  { icon: OctagonX, h: 'Stop, then prove it', p: 'If an agent misbehaves, Roll Call stops it. Then it tests that the agent really cannot act again.', to: ['#/drill', 'Run a drill yourself'] },
 ] as const;
+
+
+/** The one incident, readable in five seconds. External Refund Processing Agent run if measured, else the runaway-loop drill, labelled as that. */
+function IncidentCard({ loading }: { loading: boolean }) {
+  const inc = useIncident();
+  const x = useStore((s) => s.impact?.external), st = (useStore((s) => s.impact?.drill?.stagesP95Ms) ?? {}) as Record<string, number>;
+  const ext = inc?.kind === 'external';
+  const detMs = ext ? pickNum(x?.timeline, ['faultStartToDetectedMs']) ?? pickNum(x, ['detectedMs', 'timeToDetectMs']) : st.detected;
+  const label = ext ? inc.label : 'Runaway-loop drill';
+  const steps: { h: string; big: ReactNode; sub: string }[] = [
+    { h: ext ? 'Repeated refund requests detected' : 'Runaway loop detected', big: isNum(detMs) ? `after ${secs(detMs)}` : isNum(inc?.flagged) ? `${inc?.flagged} requests` : 'time not recorded', sub: ext ? 'the same refund asked for again and again' : 'one agent started repeating the same call' },
+    { h: 'Agent stopped', big: isNum(inc?.stopMs) ? `in ${secs(inc!.stopMs!)}` : 'time not recorded', sub: isNum(inc?.allowedBeforeStop) ? `${Math.round(inc!.allowedBeforeStop!)} requests went through first` : 'from the start of the fault' },
+    { h: 'Further requests denied', big: isNum(inc?.deniedAfter) ? `${Math.round(inc!.deniedAfter!)} blocked` : 'count not recorded', sub: 'a test request after the stop was refused, with a signed receipt' },
+  ];
+  return (
+    <section className="incident" aria-labelledby="inc-h" data-tour="incident">
+      <div className="incident-top"><h2 id="inc-h"><span className="incident-agent">{label}</span></h2><span className="incident-chips"><KindChip kind="measured" /></span></div>
+      {inc ? <ol className="incident-steps">{steps.map((t, i) => <li key={t.h}><span className="incident-n" aria-hidden="true">{i + 1}</span><span className="incident-h">{t.h}</span><span className="incident-big measured">{t.big}</span><span className="incident-sub">{t.sub}</span></li>)}</ol>
+        : <p className="incident-empty">{loading ? 'Loading the test run' : <>Not measured yet. Run <code className="measured">make external-demo</code>.</>}</p>}
+      {inc && !ext && <p className="incident-note">This is the runaway-loop drill{inc.agent ? ` on ${inc.agent}` : ''}, not the Refund Processing Agent demo. That one is not measured yet: run <code className="measured">make external-demo</code>.</p>}
+    </section>
+  );
+}
 
 export function Story() {
   const impact = useStore((s) => s.impact);
@@ -101,25 +124,22 @@ export function Story() {
     <div className="story">
       <section className="story-hero" data-tour="story-hero" aria-labelledby="story-h">
         <div className="story-hero-t">
-          <p className="eyebrow">Roll Call in 30 seconds {source === 'fixture' && <FixtureChip />}</p>
-          <h1 id="story-h">Your company will soon run thousands of AI agents. Roll Call keeps every one of them on a leash.</h1>
+          <p className="mode-row"><ModeChip /><SimChip /></p>
+          <h1 id="story-h">AI agents can act on their own. Your business should stay in control.</h1>
+          <p className="story-lede">Roll Call detects unsafe behaviour, enforces limits, and stops a misbehaving AI agent, then proves it can't act again.</p>
           <div className="story-cta">
-            <a className="btn btn--primary btn--lg" href="#/control"><Play size={18} aria-hidden />See it live</a>
-            {recorded && <a className="btn btn--lg" href="video.html"><Video size={18} aria-hidden />Watch the 66 s video</a>}
+            <a className="btn btn--primary btn--lg" href={recorded ? 'video.html' : 'media/roll-call-demo.mp4'}><Video size={18} aria-hidden />Watch the 60-second demo</a>
+            <a className="btn btn--lg" href="#/control">Explore the technical proof<ArrowRight size={18} aria-hidden /></a>
           </div>
-          <p className="story-sub">Scroll for the 30 second version.</p>
         </div>
-        <Scene />
+        <IncidentCard loading={loading} />
       </section>
 
-      <Reveal id="problem"><p className="eyebrow">1 · The problem</p><h2>Four questions nobody can answer today.</h2>
-        <ol className="qgrid">{QUESTIONS.map((q, i) => <li key={q}><span className="qn measured">{i + 1}</span>{q}</li>)}</ol></Reveal>
-
-      <Reveal id="how"><div data-tour="story-how"><p className="eyebrow">2 · How it works</p><h2>Three steps, no exceptions.</h2></div>
+      <Reveal id="how" className="story-first"><div data-tour="story-how"><h2>What happens when an AI agent starts doing something it shouldn\u2019t?</h2><p className="story-p">Three steps, with no exceptions.</p></div>
         <ol className="steps3">{STEPS.map((s, i) => (
           <li key={s.h} className="step3"><s.icon size={26} aria-hidden /><span className="measured step3-n">Step {i + 1}</span><h3>{s.h}</h3><p>{s.p}</p><a className="textlink" href={s.to[0]}>{s.to[1]}<ArrowRight size={14} aria-hidden /></a></li>))}</ol></Reveal>
 
-      <Reveal id="results"><p className="eyebrow">3 · The results</p><h2>Measured in the last run, not promised.</h2>
+      <Reveal id="results"><p className="eyebrow">Evidence <KindChip kind="measured" /></p><h2>Measured in a test run, not promised.</h2>
         <ul className="results">
           <Result l={`spend protected${isNum(d?.runs) ? ` across ${d.runs} runaway drills` : ''}`} n={isNum(kept) ? usd(kept) : NM}
             v={spec('Spend protected', 'Sum over drill runs of ungoverned minus governed spend in the same fault window.', 'drill.spendProtectedUsd.protectedTotal', isNum(kept) ? usd(kept) : 'not measured yet', 'node scripts/drill.ts --runs 20')} />
@@ -133,19 +153,15 @@ export function Story() {
         {impactErr && <p className="muted">The last run could not be loaded, so nothing is shown as measured.</p>}
       </Reveal>
 
-      <Reveal id="why"><p className="eyebrow">4 · Why now</p><h2>Regulators want a live inventory of AI.</h2>
-        <p className="story-p">Example: OSFI guideline E-23 (Canadian financial institutions) applies from May 1, 2027. <span className="chip">Engineering interpretation, not compliance advice</span></p></Reveal>
+      <Reveal id="scene"><p className="eyebrow">One incident, replayed</p><h2>Watch it happen in six seconds.</h2><Scene /></Reveal>
 
-      <Reveal id="who"><p className="eyebrow">5 · Who it is for</p><h2>Three people lose sleep over this.</h2>
-        <ul className="who">
-          <li><h3>Risk and compliance</h3><p>A live inventory with owners, and proof when something stops.</p><a className="textlink" href="#/registry">Open the registry<ArrowRight size={14} aria-hidden /></a></li>
-          <li><h3>Platform and SRE</h3><p>Guardrails and a kill switch that work in seconds, not meetings.</p><a className="textlink" href="#/drill">Run the drill<ArrowRight size={14} aria-hidden /></a></li>
-          <li><h3>Finance</h3><p>Cost per agent, with the value assumed by its owner.</p><a className="textlink" href="#/money">See spend<ArrowRight size={14} aria-hidden /></a></li>
-        </ul></Reveal>
+      <Reveal id="biz" className="story-band"><p className="eyebrow"><Briefcase size={14} aria-hidden /> For the people who pay for it</p><h2>What would this save your company?</h2>
+        <p className="story-p">Who buys it, who uses it, and a calculator you can change. The measured test results stay separate from the projection.</p>
+        <div className="story-cta"><a className="btn btn--primary btn--lg" href="#/business">See the business case<ArrowRight size={18} aria-hidden /></a></div></Reveal>
 
-      <Reveal id="cta" className="story-band"><h2>See it for yourself.</h2>
+      <Reveal id="cta" className="story-band"><h2>See it for yourself.</h2><p className="story-p">Regulators are asking companies for a live inventory of their AI. Example: OSFI guideline E-23 applies from May 1, 2027 <span className="chip">Engineering interpretation, not compliance advice</span></p>
         <div className="story-cta">
-          <a className="btn btn--primary btn--lg" href="#/drill"><Play size={18} aria-hidden />Run a drill yourself</a>
+          <a className="btn btn--primary btn--lg" href="#/drill">Run a drill yourself</a>
           <a className="btn btn--lg" href="#/control">Open the control room<ArrowRight size={18} aria-hidden /></a>
           <button type="button" className="btn btn--lg" onClick={() => setUi({ tour: 0 })}>Take the guided tour</button>
         </div></Reveal>

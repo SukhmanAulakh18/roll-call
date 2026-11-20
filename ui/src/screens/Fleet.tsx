@@ -14,6 +14,7 @@ import { Suspense, lazy } from 'react';
 const FleetMap = lazy(() => import('./FleetMap').then((m) => ({ default: m.FleetMap })));
 import { computeStats } from '../graph';
 import { RollRing } from '../ring';
+import { LensFirst } from '../lens';
 import { DrillBanner, LivePipeline, ReceiptChain, spotlight } from '../live';
 
 // ---------------- hero numbers ----------------
@@ -157,7 +158,7 @@ export function Ticker({ className = '' }: { className?: string }) {
   const v = useVirtualizer({ count: rows.length, getScrollElement: () => parent.current, estimateSize: () => 36, overscan: 8 });
   const hasDeny = src.some((a) => a.verdict !== 'allow');
   return (
-    <section className={`ticker ${className}`} aria-label="Live gateway decisions">
+    <section className={`ticker ${className}`} aria-label="Gateway decisions">
       <header className="ticker-h">
         <h2>Gateway decisions</h2>
         <button className="btn btn--sm" onClick={() => setPaused(!paused)} aria-pressed={paused}>{paused ? <Play size={14} aria-hidden /> : <Pause size={14} aria-hidden />}{paused ? 'Resume' : 'Pause'}</button>
@@ -240,7 +241,7 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
           {recent.length ? <ul className="mini-list">{recent.slice(0, 8).map((x) => <li key={x.receiptId}><button className="linklike" onClick={() => openReceipt(x)}><span className="measured">{clock(x.ts)}</span> <span className="measured">{x.tool}</span> <VerdictChip v={x.verdict} code={x.code} /></button></li>)}</ul> : <p className="muted">None seen in this session.</p>}
         </Tabs.Content>
         <Tabs.Content value="touch" className="tabs-c">
-          <h3 className="sub">Tools, live calls per second</h3>
+          <h3 className="sub">Tools, calls per second</h3>
           <ul className="mini-list">{a.scopes.tools.map((t) => <li key={t} className="kv-row"><span className="measured">{t}</span><span className="measured">{toolRate(t).toFixed(1)}/s</span></li>)}</ul>
           <h3 className="sub">Data</h3>
           <p className="taglist">{a.scopes.data.map((t) => <span className="tag" key={t}>{t.replace(/^synthetic-/, '')}</span>)}</p>
@@ -265,35 +266,6 @@ export function AgentPanel({ id, onClose }: { id: string; onClose: () => void })
 }
 
 // ---------------- business band ----------------
-function BusinessBand() {
-  const impact = useStore((s) => s.impact);
-  const fleet = useStore((s) => s.fleet);
-  const d = impact?.drill;
-  const kept = d?.spendProtectedUsd?.protectedTotal;
-  const p95 = d?.timeToContainMs?.p95;
-  const NM = <span className="biz-na">not measured yet</span>;
-  return (
-    <section className="biz" data-tour="biz" aria-labelledby="biz-h">
-      <h1 id="biz-h" className="biz-h">Companies are going from a few AI pilots to thousands of agents.</h1>
-      <div className="biz-grid">
-        <div className="biz-problem">
-          <p className="biz-k">The problem: four questions nobody can answer fast</p>
-          <ol className="biz-q"><li>What agents exist?</li><li>What does it cost?</li><li>Can I stop one, fast?</li><li>Can I prove it?</li></ol>
-        </div>
-        <div className="biz-answer">
-          <p className="biz-k">Roll Call answers all four, live</p>
-          <ul className="biz-out">
-            <li><span className="biz-n measured">{isNum(kept) ? <CountUp value={kept} format={(n) => usd(n)} /> : NM}</span><span className="biz-l">spend protected{isNum(d?.runs) ? <> over {d.runs} runaway drills</> : null}</span></li>
-            <li><span className="biz-n measured">{isNum(p95) ? <CountUp value={p95} format={(n) => secs(n)} /> : NM}</span><span className="biz-l">time to contain, p95, with a simulated owner ack{isNum(d?.simulatedOwnerAckMs) ? <> of {secs(d.simulatedOwnerAckMs)}</> : null} (no real person is paged)</span></li>
-            <li><span className="biz-n measured">{fleet ? <><CountUp value={fleet.registered} format={(n) => String(Math.round(n))} /> registered, <CountUp value={fleet.unregisteredRunning} format={(n) => String(Math.round(n))} /> unregistered</> : NM}</span><span className="biz-l">agents under control</span></li>
-          </ul>
-        </div>
-      </div>
-      <p className="biz-why"><strong>Why now:</strong> regulators are asking for live AI inventories — e.g. OSFI E-23 (Canadian financial institutions) from May 1, 2027. Engineering interpretation, not compliance advice.</p>
-    </section>
-  );
-}
-
 // ---------------- screen ----------------
 export function Fleet({ selected }: { selected: string | null }) {
   const [view, setView] = useLocal<'roll' | 'topology'>('view', 'roll');
@@ -303,7 +275,7 @@ export function Fleet({ selected }: { selected: string | null }) {
   const source = useStore((s) => s.source);
   return (
     <div className="fleet">
-      <BusinessBand />
+      <LensFirst />
       <DrillBanner />
       <LivePipeline />
       <section className={`hero ${selected ? 'has-side' : ''}`}>

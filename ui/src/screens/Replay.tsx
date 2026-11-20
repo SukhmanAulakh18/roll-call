@@ -25,7 +25,7 @@ export function Replay() {
   const label = r.status === 'loading' ? 'Loading' : r.status === 'done' ? 'Finished' : r.status === 'paused' ? 'Paused' : 'Playing';
   return (
     <div className="replay">
-      <header className="page-h"><div><h1>Replay</h1><p className="lead">A recorded run played back in your browser. No backend needed. Nothing here is live.</p></div>{FIXTURE && <FixtureChip />}</header>
+      <header className="page-h"><div><h1>Replay</h1><p className="lead">A recorded run played back in your browser. No backend needed. Nothing here is live: it is a recording.</p></div>{FIXTURE && <FixtureChip />}</header>
       <section className="transport" aria-label="Replay controls">
         <div className="transport-row">
           {r.status === 'playing' ? <button className="btn btn--primary btn--lg" onClick={replayPause}><Pause size={18} aria-hidden />Pause</button> : <button className="btn btn--primary btn--lg" onClick={r.status === 'done' ? replayRestart : replayPlay} disabled={r.status === 'loading'}>{r.status === 'done' ? <RotateCcw size={18} aria-hidden /> : <Play size={18} aria-hidden />}{r.status === 'done' ? 'Play again' : 'Play'}</button>}

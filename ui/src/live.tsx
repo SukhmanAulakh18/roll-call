@@ -55,7 +55,7 @@ export function LivePipeline() {
   return (
     <section className="pipe" aria-labelledby="pipe-h" data-tour="pipe">
       <div className="pipe-head">
-        <h2 id="pipe-h">How it works, live: every call passes the gateway</h2>
+        <h2 id="pipe-h">How it works: every call is checked first</h2>
         <p className="pipe-sub">{call ? <>Latest call: <strong>{who}</strong> asked for <code className="measured">{call.tool}</code></> : 'Waiting for the first call. Run a drill to watch one.'}</p>
       </div>
       <div className="pipe-row">
