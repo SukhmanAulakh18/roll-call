@@ -15,11 +15,12 @@ const Admission = lazy(() => import('./screens/Admission').then((m) => ({ defaul
 const Money = lazy(() => import('./screens/Money'));
 const Engineering = lazy(() => import('./screens/Engineering').then((m) => ({ default: m.Engineering })));
 const Registry = lazy(() => import('./screens/Registry').then((m) => ({ default: m.Registry })));
+const Story = lazy(() => import('./screens/Story').then((m) => ({ default: m.Story })));
 const Replay = lazy(() => import('./screens/Replay').then((m) => ({ default: m.Replay })));
 
 export type Lens = 'exec' | 'ops' | 'eng';
 const LENSES: { id: Lens; label: string }[] = [{ id: 'exec', label: 'Executive' }, { id: 'ops', label: 'Operations' }, { id: 'eng', label: 'Engineering' }];
-const NAV = { fleet: ['', 'The roll'], drill: ['drill', 'Drill'], admission: ['admission', 'Admission'], money: ['money', 'Spend and value'], eng: ['engineering', 'Engineering'], registry: ['registry', 'Registry'], replay: ['replay', 'Replay'] } as const;
+const NAV = { fleet: ['control', 'Control room'], drill: ['drill', 'Drill'], admission: ['admission', 'Admission'], money: ['money', 'Spend and value'], eng: ['engineering', 'Engineering'], registry: ['registry', 'Registry'], replay: ['replay', 'Replay'] } as const;
 const ORDER: Record<Lens, (keyof typeof NAV)[]> = {
   exec: ['fleet', 'money', 'drill', 'admission', 'registry', 'eng', 'replay'],
   ops: ['fleet', 'drill', 'admission', 'registry', 'money', 'eng', 'replay'],
@@ -60,7 +61,7 @@ export function App() {
 
   const selected = r0 === 'agent' ? r1 ?? null : null;
   const page = r0 === 'drill' ? <Drill /> : r0 === 'admission' ? <Admission /> : r0 === 'money' || r0 === 'spend' || r0 === 'value' ? <Money tab={r0 === 'money' ? r1 : r0 === 'spend' ? 'spend' : 'value'} />
-    : r0 === 'engineering' ? <Engineering /> : r0 === 'registry' ? <Registry /> : isReplay ? <Replay /> : <Fleet selected={selected} />;
+    : r0 === 'engineering' ? <Engineering /> : r0 === 'registry' ? <Registry /> : isReplay ? <Replay /> : r0 === 'control' || r0 === 'agent' ? <Fleet selected={selected} /> : <Story />;
   const recorded = REPLAY_ONLY || source === 'recorded';
   const status = source === 'recorded' ? 'Recorded run, looping' : source === 'replay' ? 'Replay, recorded' : source === 'fixture' ? 'Fixture simulator' : connected ? 'Live stream connected' : 'Stream not connected';
 
@@ -73,7 +74,7 @@ export function App() {
           <nav aria-label="Screens" className="nav">
             {ORDER[lens].map((k) => {
               const [p, label] = NAV[k];
-              const cur = p === '' ? r0 === '' || r0 === 'agent' : r0 === p || (p === 'money' && (r0 === 'spend' || r0 === 'value'));
+              const cur = p === 'control' ? r0 === 'control' || r0 === 'agent' : r0 === p || (p === 'money' && (r0 === 'spend' || r0 === 'value'));
               return <a key={k} href={`#/${p}`} aria-current={cur ? 'page' : undefined}>{label}</a>;
             })}
             {recorded && <a href="video.html" className="nav-video"><Video size={14} aria-hidden />Watch the 66 s video</a>}
@@ -82,7 +83,7 @@ export function App() {
             {FIXTURE && <FixtureChip />}
             {recorded && <span className="chip chip--cool rec-badge" role="status" title="Every number on this site comes from a recorded run of the simulated fleet. The live stream is the recording, looped at real speed.">Recorded run · no live backend</span>}
             <div className="seg seg--lens" role="radiogroup" aria-label="Lens">
-              {LENSES.map((l) => <button key={l.id} role="radio" aria-checked={lens === l.id} onClick={() => { setLens(l.id); location.hash = '#/'; }}>{l.label}</button>)}
+              {LENSES.map((l) => <button key={l.id} role="radio" aria-checked={lens === l.id} onClick={() => { setLens(l.id); location.hash = '#/control'; }}>{l.label}</button>)}
             </div>
             <button className="btn btn--sm" onClick={() => setUi({ palette: true })}><CmdIcon size={14} aria-hidden /><span className="visually-hidden">Search</span><kbd>Ctrl K</kbd></button>
             <button className="btn btn--sm btn--tour" onClick={() => setUi({ tour: 0 })}><GraduationCap size={14} aria-hidden /><span className="hide-s">Tour</span></button>

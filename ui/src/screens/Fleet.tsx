@@ -297,7 +297,7 @@ function BusinessBand() {
 // ---------------- screen ----------------
 export function Fleet({ selected }: { selected: string | null }) {
   const [view, setView] = useLocal<'roll' | 'topology'>('view', 'roll');
-  const select = (id: string | null) => { location.hash = id ? `#/agent/${encodeURIComponent(id)}` : '#/'; };
+  const select = (id: string | null) => { location.hash = id ? `#/agent/${encodeURIComponent(id)}` : '#/control'; };
   const running = useStore((s) => !!s.drillRun && s.drillRun.phase !== 'done' && s.drillRun.phase !== 'error');
   const goDrill = () => { if (running) { location.hash = '#/drill'; return; } void runDrill('runaway-loop', true); };
   const source = useStore((s) => s.source);

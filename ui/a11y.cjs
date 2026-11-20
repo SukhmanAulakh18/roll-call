@@ -3,7 +3,7 @@
 const { chromium } = require('playwright');
 const { AxeBuilder } = require('@axe-core/playwright');
 const BASE = process.argv[2] || 'http://127.0.0.1:7100/';
-const ROUTES = ['', 'agent/invoice-recon', 'drill', 'admission', 'money', 'engineering', 'registry', 'replay'];
+const ROUTES = ['', 'control', 'agent/invoice-recon', 'drill', 'admission', 'money', 'engineering', 'registry', 'replay'];
 (async () => {
   const b = await chromium.launch(); let bad = 0, all = 0;
   for (const mode of ['real', 'fixture']) for (const theme of ['dark', 'light']) {

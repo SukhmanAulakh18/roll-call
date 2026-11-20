@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Command } from 'cmdk';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Activity, Bot, Flame, Gauge, GraduationCap, History, Monitor, Moon, OctagonX, Rocket, Repeat2, ShieldQuestion, Table2, Wallet } from 'lucide-react';
+import { Activity, Bot, Flame, Gauge, GraduationCap, History, Monitor, Moon, Presentation, OctagonX, Rocket, Repeat2, ShieldQuestion, Table2, Wallet } from 'lucide-react';
 import { resetDrills, runDrill, useStore } from './store';
 import { setUi, useUi } from './ui-state';
 
@@ -27,7 +27,8 @@ export function Palette({ theme, setTheme }: { theme: 'dark' | 'light'; setTheme
             <Command.List>
               <Command.Empty>Nothing matches. Try an agent name, drill, or lens.</Command.Empty>
               <Command.Group heading="Go to">
-                <Command.Item onSelect={run(() => go('#/'))}><Activity size={16} aria-hidden />Fleet map</Command.Item>
+                <Command.Item onSelect={run(() => go('#/'))}><Presentation size={16} aria-hidden />Roll Call in 30 seconds</Command.Item>
+                <Command.Item onSelect={run(() => go('#/control'))}><Activity size={16} aria-hidden />Control room</Command.Item>
                 <Command.Item onSelect={run(() => go('#/drill'))}><Flame size={16} aria-hidden />Drill theatre</Command.Item>
                 <Command.Item onSelect={run(() => go('#/admission'))}><Rocket size={16} aria-hidden />Admission playground</Command.Item>
                 <Command.Item onSelect={run(() => go('#/money'))}><Wallet size={16} aria-hidden />Spend and value</Command.Item>
